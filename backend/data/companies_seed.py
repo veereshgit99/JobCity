@@ -23,18 +23,27 @@ COMPANIES_SEED = [
 ]
 
 JOB_TITLES = [
+    # Software (Full Stack / Backend / Frontend / DevOps / SRE / FDE)
     "Software Engineer", "Senior Software Engineer", "Staff Software Engineer",
-    "Frontend Engineer", "Backend Engineer", "Full Stack Engineer",
+    "Frontend Engineer", "Senior Frontend Engineer",
+    "Backend Engineer", "Senior Backend Engineer",
+    "Full Stack Engineer", "Senior Full Stack Engineer",
     "Mobile Engineer (iOS)", "Mobile Engineer (Android)",
-    "Data Engineer", "Machine Learning Engineer", "ML Research Scientist",
-    "Site Reliability Engineer", "DevOps Engineer", "Platform Engineer",
+    "Site Reliability Engineer", "Senior SRE",
+    "DevOps Engineer", "Platform Engineer",
+    "Forward Deployed Engineer", "Forward Deployed Software Engineer",
     "Security Engineer", "Infrastructure Engineer",
-    "Product Manager", "Senior Product Manager", "Technical Program Manager",
-    "Product Designer", "UX Designer", "Design Engineer",
-    "Engineering Manager", "Director of Engineering",
-    "Data Scientist", "Analytics Engineer",
-    "Solutions Engineer", "Developer Advocate",
-    "QA Engineer", "Game Engineer",
+    "Game Engine Engineer",
+    # ML / AI
+    "Machine Learning Engineer", "Senior ML Engineer", "Staff ML Engineer",
+    "ML Research Scientist", "Applied ML Scientist",
+    "AI Research Engineer", "Foundation Model Engineer",
+    "Computer Vision Engineer", "NLP Engineer",
+    "Data Engineer", "Data Scientist",
+    # Robotics
+    "Robotics Engineer", "Robotics Software Engineer",
+    "Perception Engineer", "Controls Engineer",
+    "Autonomy Engineer", "Embedded Software Engineer",
 ]
 
 JOB_DESCRIPTION_TEMPLATE = (

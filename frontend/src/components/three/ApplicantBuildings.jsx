@@ -4,6 +4,7 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import Skyscraper from "./Skyscraper";
 import { EXP_COLORS } from "@/lib/colors";
+import { getWindowTexture, floorsToHeight } from "@/lib/buildingTex";
 
 const SPACING = 2.4;
 const SKYSCRAPER_FLOOR_THRESHOLD = 8;
@@ -16,6 +17,7 @@ export default function ApplicantBuildings({
   query = "",
 }) {
   const [hoverId, setHoverId] = useState(null);
+  const tex = useMemo(() => getWindowTexture(), []);
 
   const buildings = useMemo(
     () =>
@@ -25,7 +27,7 @@ export default function ApplicantBuildings({
           ...a,
           x: a.grid_x * SPACING,
           z: a.grid_z * SPACING,
-          height: Math.max(a.floors * 0.55, 0.55),
+          height: floorsToHeight(a.floors, { unit: 1.3, base: 1.0 }),
           color: base,
         };
       }),
@@ -48,13 +50,27 @@ export default function ApplicantBuildings({
   const tall = buildings.filter((a) => a.floors >= SKYSCRAPER_FLOOR_THRESHOLD);
   const regular = buildings.filter((a) => a.floors < SKYSCRAPER_FLOOR_THRESHOLD);
   const hovered = buildings.find((a) => a.id === hoverId);
+  const focusedSelected = buildings.find((a) =>
+    selectedIds.includes(a.id) && a.floors < SKYSCRAPER_FLOOR_THRESHOLD
+  );
 
   return (
     <group>
-      {/* Regular towers — InstancedMesh */}
+      {/* Regular towers — InstancedMesh with windows */}
       <Instances limit={Math.max(regular.length, 8)} castShadow receiveShadow>
         <boxGeometry args={[1.3, 1, 1.3]} />
-        <meshStandardMaterial roughness={0.3} metalness={0.45} />
+        <meshStandardMaterial
+          map={tex}
+          emissiveMap={tex}
+          emissive="#000000"
+          emissiveIntensity={0.45}
+          roughness={0.35}
+          metalness={0.4}
+          map-repeat-x={2}
+          map-repeat-y={3}
+          emissiveMap-repeat-x={2}
+          emissiveMap-repeat-y={3}
+        />
         {regular.map((a) => (
           <ApplicantInstance
             key={a.id}
@@ -69,6 +85,24 @@ export default function ApplicantBuildings({
           />
         ))}
       </Instances>
+
+      {/* Glow lights for hovered/selected regular applicants */}
+      {hovered && hovered.floors < SKYSCRAPER_FLOOR_THRESHOLD && (
+        <pointLight
+          color={hovered.color}
+          intensity={3.5}
+          distance={14}
+          position={[hovered.x, hovered.height + 1, hovered.z]}
+        />
+      )}
+      {focusedSelected && (
+        <pointLight
+          color={"#00FFCC"}
+          intensity={5}
+          distance={18}
+          position={[focusedSelected.x, focusedSelected.height + 1, focusedSelected.z]}
+        />
+      )}
 
       {/* Skyscrapers — power applicants */}
       {tall.map((a) => (
@@ -156,7 +190,7 @@ function ApplicantInstance({
 }) {
   const ref = useRef();
   const baseColor = useMemo(() => new THREE.Color(a.color), [a.color]);
-  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.18), [baseColor]);
+  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.15), [baseColor]);
   const selectedColor = useMemo(() => new THREE.Color("#00FFCC"), []);
   const highlightColor = useMemo(() => new THREE.Color("#FF007F"), []);
   const targetScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);

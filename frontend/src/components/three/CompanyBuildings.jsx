@@ -4,11 +4,13 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import Skyscraper from "./Skyscraper";
 import { project } from "@/lib/projection";
+import { getWindowTexture, floorsToHeight } from "@/lib/buildingTex";
 
 const SKYSCRAPER_FLOOR_THRESHOLD = 8;
 
 export default function CompanyBuildings({ cities, onCompanyClick, selected, query = "" }) {
   const [hoverKey, setHoverKey] = useState(null);
+  const tex = useMemo(() => getWindowTexture(), []);
 
   const buildings = useMemo(() => {
     const out = [];
@@ -24,7 +26,7 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
           state: c.state,
           x: cx + r * Math.cos(angle),
           z: cz + r * Math.sin(angle),
-          height: Math.max(co.floors * 1.6, 1.6),
+          height: floorsToHeight(co.floors, { unit: 1.8, base: 1.2 }),
           key: `${c.city}-${co.id}-${i}`,
         });
       });
@@ -43,13 +45,27 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
   const regular = buildings.filter((b) => b.floors < SKYSCRAPER_FLOOR_THRESHOLD);
 
   const hovered = buildings.find((b) => b.key === hoverKey);
+  const selectedBuilding = buildings.find(
+    (b) => selected && selected.id === b.id && selected.city === b.city
+  );
 
   return (
     <group>
-      {/* Regular (short) buildings — single InstancedMesh */}
+      {/* Regular (short) buildings — single InstancedMesh with windows texture */}
       <Instances limit={Math.max(regular.length, 8)} castShadow receiveShadow>
         <boxGeometry args={[1.6, 1, 1.6]} />
-        <meshStandardMaterial roughness={0.45} metalness={0.15} />
+        <meshStandardMaterial
+          map={tex}
+          emissiveMap={tex}
+          emissive="#000000"
+          emissiveIntensity={0.35}
+          roughness={0.55}
+          metalness={0.1}
+          map-repeat-x={2}
+          map-repeat-y={3}
+          emissiveMap-repeat-x={2}
+          emissiveMap-repeat-y={3}
+        />
         {regular.map((b) => (
           <BuildingInstance
             key={b.key}
@@ -63,6 +79,24 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
           />
         ))}
       </Instances>
+
+      {/* Selected/Hover GLOW light over regular buildings */}
+      {hovered && hovered.floors < SKYSCRAPER_FLOOR_THRESHOLD && (
+        <pointLight
+          color={hovered.color}
+          intensity={4}
+          distance={16}
+          position={[hovered.x, hovered.height + 1, hovered.z]}
+        />
+      )}
+      {selectedBuilding && selectedBuilding.floors < SKYSCRAPER_FLOOR_THRESHOLD && (
+        <pointLight
+          color={selectedBuilding.color}
+          intensity={6}
+          distance={20}
+          position={[selectedBuilding.x, selectedBuilding.height + 1, selectedBuilding.z]}
+        />
+      )}
 
       {/* Skyscrapers — distinctive multi-tier geometry */}
       {tall.map((b) => (
@@ -85,7 +119,7 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
 
       {hovered && (
         <Html
-          position={[hovered.x, hovered.height + 1.2, hovered.z]}
+          position={[hovered.x, hovered.height + 1.5, hovered.z]}
           center
           style={{ pointerEvents: "none" }}
         >
@@ -131,8 +165,8 @@ function BuildingInstance({ b, hovered, selected, dimmed, onPointerOver, onPoint
   const ref = useRef();
   const targetScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
   const color = useMemo(() => new THREE.Color(b.color || "#FFB24C"), [b.color]);
-  const dimmedColor = useMemo(() => color.clone().multiplyScalar(0.2), [color]);
-  const highlightColor = useMemo(() => new THREE.Color("#ffffff"), []);
+  const dimmedColor = useMemo(() => color.clone().multiplyScalar(0.15), [color]);
+  const highlightColor = useMemo(() => color.clone().lerp(new THREE.Color("#ffffff"), 0.6), [color]);
 
   useFrame((_, dt) => {
     if (!ref.current) return;

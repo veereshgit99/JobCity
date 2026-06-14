@@ -70,6 +70,11 @@ async def _upsert_job(db, *, source: str, source_id: str, company_name: str, tit
                      source_url: str, posted_at: datetime) -> bool:
     if (city, state) not in US_CITIES:
         return False
+    # Filter to allowed job categories only
+    from services.job_filter import category as _category
+    cat = _category(title)
+    if cat is None:
+        return False
     lat, lng = US_CITIES[(city, state)]
     company_id = await _upsert_company(db, company_name)
     # fetch color
@@ -96,6 +101,7 @@ async def _upsert_job(db, *, source: str, source_id: str, company_name: str, tit
             "source_url": source_url,
             "posted_at": posted_at.isoformat(),
             "is_active": True,
+            "category": cat,
         },
         upsert=True,
     )

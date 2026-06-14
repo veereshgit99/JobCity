@@ -51,6 +51,32 @@ async def scheduler_status():
     return state()
 
 
+@router.post("/cleanup-categories")
+async def cleanup_non_eligible_jobs():
+    """One-shot: deactivate any job whose title doesn't match the
+    Software / ML / Robotics allowlist. Also stamps a 'category' field on
+    every active job for future filtering."""
+    from services.job_filter import category as _category
+    db = get_db()
+    deactivated = 0
+    tagged = 0
+    cursor = db.jobs.find({}, {"_id": 0, "job_id": 1, "title": 1, "is_active": 1})
+    async for j in cursor:
+        cat = _category(j.get("title") or "")
+        if cat is None:
+            if j.get("is_active"):
+                await db.jobs.update_one(
+                    {"job_id": j["job_id"]}, {"$set": {"is_active": False, "category": None}}
+                )
+                deactivated += 1
+        else:
+            await db.jobs.update_one(
+                {"job_id": j["job_id"]}, {"$set": {"is_active": True, "category": cat}}
+            )
+            tagged += 1
+    return {"ok": True, "deactivated": deactivated, "tagged": tagged}
+
+
 @router.get("/stats")
 async def stats():
     db = get_db()

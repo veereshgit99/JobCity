@@ -1,17 +1,16 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { getWindowTexture } from "@/lib/buildingTex";
 
 /**
- * A multi-tier skyscraper rendered as 3 stacked boxes with slight setbacks,
- * a thin emissive window strip on each tier, and a spire on top.
- * Used for any building with a "tall" floor count so the skyline looks
- * dramatic rather than just being one tall plain box.
+ * Multi-tier skyscraper with windows and a glow point-light when highlighted.
+ * Used for any building tall enough that a single box would look boring.
  */
 export default function Skyscraper({
   position = [0, 0, 0],
   height = 10,
-  baseWidth = 1.6,
+  baseWidth = 1.8,
   color = "#FFB24C",
   highlight = false,
   dim = false,
@@ -20,11 +19,9 @@ export default function Skyscraper({
   onPointerOut,
 }) {
   const groupRef = useRef();
-  const baseRef = useRef();
-  const midRef = useRef();
-  const topRef = useRef();
+  const refs = [useRef(), useRef(), useRef()];
+  const lightRef = useRef();
 
-  // Split height across the three tiers
   const h1 = height * 0.55;
   const h2 = height * 0.3;
   const h3 = height * 0.15;
@@ -32,9 +29,10 @@ export default function Skyscraper({
   const w2 = baseWidth * 0.78;
   const w3 = baseWidth * 0.58;
 
+  const tex = useMemo(() => getWindowTexture(), []);
   const baseColor = useMemo(() => new THREE.Color(color), [color]);
-  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.18), [baseColor]);
-  const hotColor = useMemo(() => new THREE.Color("#ffffff"), []);
+  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.15), [baseColor]);
+  const highlightColor = useMemo(() => new THREE.Color("#ffffff"), []);
 
   useFrame((_, dt) => {
     const target = highlight ? 1.05 : 1.0;
@@ -42,16 +40,28 @@ export default function Skyscraper({
       groupRef.current.scale.x += (target - groupRef.current.scale.x) * Math.min(1, dt * 8);
       groupRef.current.scale.z += (target - groupRef.current.scale.z) * Math.min(1, dt * 8);
     }
-    [baseRef, midRef, topRef].forEach((r) => {
-      if (!r.current) return;
+    refs.forEach((r) => {
+      if (!r.current?.material) return;
       const mat = r.current.material;
-      if (!mat) return;
-      const targetCol = highlight ? hotColor : dim ? dimmedColor : baseColor;
+      const targetCol = highlight ? baseColor : dim ? dimmedColor : baseColor;
       mat.color.lerp(targetCol, Math.min(1, dt * 6));
-      mat.emissive.lerp(highlight ? hotColor : targetCol, Math.min(1, dt * 6));
-      mat.emissiveIntensity = highlight ? 0.7 : dim ? 0.05 : 0.18;
+      mat.emissive.lerp(highlight ? highlightColor : targetCol, Math.min(1, dt * 6));
+      mat.emissiveIntensity = highlight ? 1.2 : dim ? 0.05 : 0.35;
     });
+    if (lightRef.current) {
+      lightRef.current.intensity += ((highlight ? 6 : 0) - lightRef.current.intensity) * Math.min(1, dt * 6);
+    }
   });
+
+  const matProps = {
+    color,
+    map: tex,
+    emissive: color,
+    emissiveMap: tex,
+    emissiveIntensity: 0.35,
+    roughness: 0.45,
+    metalness: 0.25,
+  };
 
   return (
     <group
@@ -73,30 +83,45 @@ export default function Skyscraper({
       }}
     >
       {/* Base */}
-      <mesh ref={baseRef} position={[0, h1 / 2, 0]} castShadow receiveShadow>
+      <mesh ref={refs[0]} position={[0, h1 / 2, 0]} castShadow receiveShadow>
         <boxGeometry args={[w1, h1, w1]} />
-        <meshStandardMaterial color={color} roughness={0.45} metalness={0.2} />
+        <meshStandardMaterial
+          {...matProps}
+          map-repeat-x={Math.max(1, Math.round(w1))}
+          map-repeat-y={Math.max(2, Math.round(h1 / 1.5))}
+          emissiveMap-repeat-x={Math.max(1, Math.round(w1))}
+          emissiveMap-repeat-y={Math.max(2, Math.round(h1 / 1.5))}
+        />
       </mesh>
       {/* Mid */}
-      <mesh ref={midRef} position={[0, h1 + h2 / 2, 0]} castShadow>
+      <mesh ref={refs[1]} position={[0, h1 + h2 / 2, 0]} castShadow>
         <boxGeometry args={[w2, h2, w2]} />
-        <meshStandardMaterial color={color} roughness={0.4} metalness={0.25} />
+        <meshStandardMaterial
+          {...matProps}
+          map-repeat-x={Math.max(1, Math.round(w2))}
+          map-repeat-y={Math.max(2, Math.round(h2 / 1.5))}
+          emissiveMap-repeat-x={Math.max(1, Math.round(w2))}
+          emissiveMap-repeat-y={Math.max(2, Math.round(h2 / 1.5))}
+        />
       </mesh>
       {/* Top */}
-      <mesh ref={topRef} position={[0, h1 + h2 + h3 / 2, 0]} castShadow>
+      <mesh ref={refs[2]} position={[0, h1 + h2 + h3 / 2, 0]} castShadow>
         <boxGeometry args={[w3, h3, w3]} />
-        <meshStandardMaterial color={color} roughness={0.35} metalness={0.3} />
+        <meshStandardMaterial
+          {...matProps}
+          map-repeat-x={Math.max(1, Math.round(w3))}
+          map-repeat-y={Math.max(2, Math.round(h3 / 1.5))}
+          emissiveMap-repeat-x={Math.max(1, Math.round(w3))}
+          emissiveMap-repeat-y={Math.max(2, Math.round(h3 / 1.5))}
+        />
       </mesh>
       {/* Spire */}
       <mesh position={[0, height + 0.6, 0]} castShadow>
-        <cylinderGeometry args={[0.04, 0.04, 1.0, 6]} />
+        <cylinderGeometry args={[0.05, 0.05, 1.0, 6]} />
         <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
       </mesh>
-      {/* Window light strip */}
-      <mesh position={[0, h1 + h2 / 2, w2 / 2 + 0.001]}>
-        <planeGeometry args={[w2 * 0.85, h2 * 0.7]} />
-        <meshBasicMaterial color={highlight ? "#ffffff" : color} transparent opacity={highlight ? 0.55 : 0.18} />
-      </mesh>
+      {/* Glow light when selected/hovered */}
+      <pointLight ref={lightRef} color={color} intensity={0} distance={18} position={[0, height * 0.6, 0]} />
     </group>
   );
 }

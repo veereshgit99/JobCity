@@ -37,10 +37,10 @@
 - ✅ JWT email/password auth + Emergent Google session bridge
 - ✅ MongoDB models with UUID `user_id` (no ObjectId leakage), unique indexes
 - ✅ Seed script: 20 companies, ~351 templated jobs, 30 demo applicants, demo applications, admin + demo accounts
-- ✅ Real data ingestion: **RemoteOK + Greenhouse + Lever + YC/HN** = 1,400+ active jobs across 97 companies (auto-refresh every 6h via background scheduler)
+- ✅ Real data ingestion: **RemoteOK + Greenhouse + Lever + YC/HN**, server-side **filter to Software/ML/Robotics only** (`services/job_filter.py`); ~763 active jobs split 118 software / 55 ML / 27 robotics across 38 companies. Auto-refresh every 6h.
 - ✅ Aggregation endpoints: `/api/jobs-city/buildings` and `/api/applicants-city/buildings`
-- ✅ 3D Jobs City — extruded USA polygon, **InstancedMesh** for short buildings, **multi-tier skyscrapers with spires for tall buildings (≥8 floors)**, dusk lighting, city label rings, search-bar dim
-- ✅ 3D Applicants City — cyan grid floor, voxel towers colored by experience level, **multi-tier skyscrapers for power users (≥8 applications)**, GitHub antennas, night palette, search-bar dim by name/level/github
+- ✅ 3D Jobs City — **sqrt-scaled building heights** (no more 167-floor monoliths), **procedural window textures on every building** (Canvas-generated, lit/unlit grid), **point-light glow on hover & selection**, InstancedMesh path for short buildings, multi-tier skyscrapers with spires for tall ones, search-bar dim
+- ✅ 3D Applicants City — same windows + glow + sqrt scaling, neon experience-level palette, GitHub antennas, skyscrapers for power users, search-bar dim by name/level/github
 - ✅ Apply flow with duplicate prevention, cover note, toast feedback
 - ✅ AI match score on `/jobs/:id` — Claude Sonnet 4.5 via Emergent LLM key, 24h cache
 - ✅ GitHub link on `/profile` — paste a username, public events API counts last-30-day commits and updates the antenna
