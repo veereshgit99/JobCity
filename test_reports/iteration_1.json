@@ -1,0 +1,43 @@
+{
+  "summary": "First-iteration end-to-end test of JobCity. Ran 14 backend pytest cases + a Playwright pass over Landing, Jobs-City, Applicants-City, Login (prefilled demo), Register, Profile, and NavBar logout. After fixing one backend MongoDB OverflowError in /api/auth/register (md5 hash being inserted as a 128-bit int — out of BSON 8-byte int range), 100% of backend and 100% of mapped frontend flows are passing.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "OPTIONAL: The /applicants-city compare-bar (data-testid='compare-bar') is rendered conditionally when two+ applicant towers are picked in the 3D canvas. The data-testid exists and the JSX path is correct, but automated random canvas clicks do not deterministically hit a 3D tower via raycast. Consider exposing a fallback DOM list of applicant names with data-testid='applicant-pick-{id}' to enable robust e2e testing of the compare flow.",
+    "OPTIONAL: Add data-testid attributes for the user's applications count on /profile (currently we verify the email + my-building-link + visually confirmed 5 application rows)."
+  ],
+  "critical_code_review_comments": [
+    "FIXED: /app/backend/routes/auth.py _ensure_applicant_profile used int(md5_hex, 16) which yields a 128-bit int; MongoDB BSON only supports 8-byte ints, so every POST /api/auth/register was returning 500. Patched to take only the first 8 hex chars (32-bit).",
+    "Cookie strategy is sound (httponly + samesite=none + secure) and Bearer token path is used in parallel by the FE for cross-origin resilience — verified Set-Cookie headers contain both access_token and refresh_token on login.",
+    "/api/auth/me returns 401 without auth and 200 with Bearer — correct.",
+    "Companies endpoint returns 20+ companies each carrying jobs_count — correct.",
+    "Duplicate-application check correctly returns 400 on a second POST /api/applications with the same job_id.",
+    "Compare endpoint returns both items with stats {applications_count, github_commits_30d, top_companies} — correct.",
+    "Admin /api/admin/seed is idempotent across two consecutive POSTs."
+  ],
+  "updated_files": [
+    "/app/backend/routes/auth.py (fix md5-int overflow for MongoDB BSON)",
+    "/app/backend/tests/backend_test.py (new pytest suite)"
+  ],
+  "success_rate": {
+    "backend": "100% (14/14)",
+    "frontend": "100% of mapped flows (Landing, Jobs-City, Applicants-City guide, Login+redirect, Register+redirect, Profile, NavBar logged-in/out states, Logout)"
+  },
+  "test_credentials": "demo@jobcity.app / Demo123! (5 seeded applications), admin@jobcity.app / Admin123! — both verified usable. /app/memory/test_credentials.md is populated correctly.",
+  "seed_data_creation": "Did NOT create persistent seed data. Test users created during register tests use unique timestamp suffix emails (test+<ts>@jobcity.app, jc+<ts>@jobcity.app). Apply test creates a single new application for the demo user against a job not already applied to.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest lives at /app/backend/tests/backend_test.py — run with: cd /app && python -m pytest backend/tests/backend_test.py -v --junitxml=/app/test_reports/pytest/pytest_results.xml. The jobs API returns jobs with the field name job_id (not id). The compare-bar can only be triggered by precise raycast clicks on canvas towers; consider adding a DOM-based applicant picker for e2e. Auth uses both cookies and Authorization: Bearer headers — Bearer is the most reliable for cross-origin programmatic tests.",
+  "rca_of_the_issue": "RCA — POST /api/auth/register 500: routes/auth.py:59 computed `seed = int(hashlib.md5(user_id.encode()).hexdigest(), 16)` producing a 128-bit integer; the value then went into db.applicants.insert_one and pymongo BSON encoder raised `OverflowError: MongoDB can only handle up to 8-byte ints`. Reproduction: POST /api/auth/register with any new unique email -> 500. Mitigation applied: take only the first 8 hex chars of the md5 hash before int() so the seed fits comfortably in a 32-bit int (well within BSON's signed 64-bit limit). Verified by re-running the pytest suite (register + /auth/me) and the Playwright register UI flow (redirects to /profile and renders the user)."
+}
