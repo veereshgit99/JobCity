@@ -110,6 +110,44 @@ async def jobs_city_buildings():
     return {"cities": out}
 
 
+@router.get("/jobs/{job_id}/summary")
+async def job_brief(job_id: str):
+    """LLM-generated role summary + required/nice-to-have skills. No auth required.
+    Cached for 7 days in `job_briefs` collection so we don't re-spend on Claude."""
+    db = get_db()
+    job = await db.jobs.find_one({"job_id": job_id}, {"_id": 0})
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    from datetime import datetime, timezone, timedelta
+    cached = await db.job_briefs.find_one({"job_id": job_id}, {"_id": 0})
+    if cached:
+        try:
+            created = datetime.fromisoformat(cached["created_at"])
+            if created.tzinfo is None:
+                created = created.replace(tzinfo=timezone.utc)
+            if datetime.now(timezone.utc) - created < timedelta(days=7):
+                return {"brief": {k: cached[k] for k in ("summary", "required_skills", "nice_to_have", "seniority")}, "cached": True}
+        except Exception:
+            pass
+
+    try:
+        from services.llm import job_role_brief
+        result = await job_role_brief(job=job)
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"AI service error: {e}")
+    await db.job_briefs.replace_one(
+        {"job_id": job_id},
+        {
+            "job_id": job_id,
+            **result,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        },
+        upsert=True,
+    )
+    return {"brief": result, "cached": False}
+
+
 @router.post("/jobs/{job_id}/match-score")
 async def match_score(job_id: str, request: Request):
     """LLM-powered match score (Claude Sonnet 4.5 via Emergent LLM key)."""
