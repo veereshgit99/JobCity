@@ -4,7 +4,7 @@ import { OrbitControls, Grid } from "@react-three/drei";
 import ApplicantBuildings from "./ApplicantBuildings";
 import { api } from "@/lib/api";
 
-export default function ApplicantsCityScene({ onApplicantClick, selectedIds = [], highlightId }) {
+export default function ApplicantsCityScene({ onApplicantClick, selectedIds = [], highlightId, query = "" }) {
   const [applicants, setApplicants] = useState(null);
 
   useEffect(() => {
@@ -69,6 +69,7 @@ export default function ApplicantsCityScene({ onApplicantClick, selectedIds = []
             onClick={onApplicantClick}
             selectedIds={selectedIds}
             highlightId={highlightId}
+            query={query}
           />
         )}
       </Suspense>

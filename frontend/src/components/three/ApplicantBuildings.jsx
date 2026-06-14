@@ -1,96 +1,195 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { Html, Instance, Instances } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import * as THREE from "three";
+import Skyscraper from "./Skyscraper";
 import { EXP_COLORS } from "@/lib/colors";
 
 const SPACING = 2.4;
+const SKYSCRAPER_FLOOR_THRESHOLD = 8;
 
-export default function ApplicantBuildings({ applicants, selectedIds = [], onClick, highlightId }) {
+export default function ApplicantBuildings({
+  applicants,
+  selectedIds = [],
+  onClick,
+  highlightId,
+  query = "",
+}) {
+  const [hoverId, setHoverId] = useState(null);
+
+  const buildings = useMemo(
+    () =>
+      applicants.map((a) => {
+        const base = EXP_COLORS[a.experience_level] || EXP_COLORS.entry;
+        return {
+          ...a,
+          x: a.grid_x * SPACING,
+          z: a.grid_z * SPACING,
+          height: Math.max(a.floors * 0.55, 0.55),
+          color: base,
+        };
+      }),
+    [applicants]
+  );
+
+  const q = (query || "").trim().toLowerCase();
+  const matchesQuery = (a) => {
+    if (!q) return true;
+    const fields = [
+      a.display_name,
+      a.experience_level,
+      a.has_github ? "github" : "",
+    ]
+      .filter(Boolean)
+      .map((s) => String(s).toLowerCase());
+    return fields.some((f) => f.includes(q));
+  };
+
+  const tall = buildings.filter((a) => a.floors >= SKYSCRAPER_FLOOR_THRESHOLD);
+  const regular = buildings.filter((a) => a.floors < SKYSCRAPER_FLOOR_THRESHOLD);
+  const hovered = buildings.find((a) => a.id === hoverId);
+
   return (
     <group>
-      {applicants.map((a) => (
-        <ApplicantBuilding
-          key={a.id}
-          a={a}
-          isSelected={selectedIds.includes(a.id)}
-          isHighlighted={highlightId === a.id}
-          onClick={() => onClick?.(a)}
-        />
+      {/* Regular towers — InstancedMesh */}
+      <Instances limit={Math.max(regular.length, 8)} castShadow receiveShadow>
+        <boxGeometry args={[1.3, 1, 1.3]} />
+        <meshStandardMaterial roughness={0.3} metalness={0.45} />
+        {regular.map((a) => (
+          <ApplicantInstance
+            key={a.id}
+            a={a}
+            hovered={hoverId === a.id}
+            selected={selectedIds.includes(a.id)}
+            highlighted={highlightId === a.id}
+            dimmed={q ? !matchesQuery(a) : false}
+            onPointerOver={() => setHoverId(a.id)}
+            onPointerOut={() => setHoverId((cur) => (cur === a.id ? null : cur))}
+            onClick={() => onClick?.(a)}
+          />
+        ))}
+      </Instances>
+
+      {/* Skyscrapers — power applicants */}
+      {tall.map((a) => (
+        <group key={a.id}>
+          <Skyscraper
+            position={[a.x, 0, a.z]}
+            height={a.height}
+            baseWidth={1.5}
+            color={
+              highlightId === a.id
+                ? "#FF007F"
+                : selectedIds.includes(a.id)
+                ? "#00FFCC"
+                : a.color
+            }
+            highlight={
+              hoverId === a.id ||
+              selectedIds.includes(a.id) ||
+              highlightId === a.id
+            }
+            dim={q ? !matchesQuery(a) : false}
+            onClick={() => onClick?.(a)}
+            onPointerOver={() => setHoverId(a.id)}
+            onPointerOut={() => setHoverId((cur) => (cur === a.id ? null : cur))}
+          />
+          {a.has_github && (
+            <mesh position={[a.x, a.height + 1.8, a.z]} castShadow>
+              <cylinderGeometry args={[0.06, 0.06, 1.2, 6]} />
+              <meshStandardMaterial color="#00FFCC" emissive="#00FFCC" emissiveIntensity={0.9} />
+            </mesh>
+          )}
+        </group>
       ))}
-    </group>
-  );
-}
 
-function ApplicantBuilding({ a, isSelected, isHighlighted, onClick }) {
-  const ref = useRef();
-  const [hovered, setHovered] = useState(false);
-  const height = Math.max(a.floors * 0.55, 0.55);
-  const x = a.grid_x * SPACING;
-  const z = a.grid_z * SPACING;
-  const base = EXP_COLORS[a.experience_level] || EXP_COLORS.entry;
-  const accent = isHighlighted ? "#FF007F" : isSelected ? "#00FFCC" : base;
+      {/* GitHub antennas on regular towers */}
+      {regular
+        .filter((a) => a.has_github)
+        .map((a) => (
+          <mesh
+            key={`ant-${a.id}`}
+            position={[a.x, a.height + 0.55, a.z]}
+            castShadow
+          >
+            <cylinderGeometry args={[0.04, 0.04, 0.9, 6]} />
+            <meshStandardMaterial color="#00FFCC" emissive="#00FFCC" emissiveIntensity={0.8} />
+          </mesh>
+        ))}
 
-  useFrame((_, dt) => {
-    if (!ref.current) return;
-    const t = isHighlighted ? 1.15 : isSelected ? 1.08 : hovered ? 1.04 : 1.0;
-    ref.current.scale.x += (t - ref.current.scale.x) * Math.min(1, dt * 8);
-    ref.current.scale.z += (t - ref.current.scale.z) * Math.min(1, dt * 8);
-  });
-
-  return (
-    <group position={[x, 0, z]}>
-      <mesh
-        ref={ref}
-        position={[0, height / 2, 0]}
-        castShadow
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick?.();
-        }}
-        onPointerOver={(e) => {
-          e.stopPropagation();
-          setHovered(true);
-          document.body.style.cursor = "pointer";
-        }}
-        onPointerOut={() => {
-          setHovered(false);
-          document.body.style.cursor = "";
-        }}
-      >
-        <boxGeometry args={[1.3, height, 1.3]} />
-        <meshStandardMaterial
-          color={accent}
-          emissive={accent}
-          emissiveIntensity={hovered || isSelected || isHighlighted ? 0.7 : 0.18}
-          roughness={0.3}
-          metalness={0.45}
-        />
-      </mesh>
-      {/* Antenna for github */}
-      {a.has_github && (
-        <mesh position={[0, height + 0.55, 0]} castShadow>
-          <cylinderGeometry args={[0.04, 0.04, 0.9, 6]} />
-          <meshStandardMaterial color="#00FFCC" emissive="#00FFCC" emissiveIntensity={0.8} />
-        </mesh>
-      )}
       {hovered && (
-        <Html position={[0, height + 1.2, 0]} center style={{ pointerEvents: "none" }}>
+        <Html
+          position={[hovered.x, hovered.height + 1.5, hovered.z]}
+          center
+          style={{ pointerEvents: "none" }}
+        >
           <div className="glass rounded-md px-3 py-2 text-xs whitespace-nowrap">
             <div className="font-mono text-[10px] tracking-widest text-white/50">
-              {a.experience_level.toUpperCase()}
+              {hovered.experience_level.toUpperCase()}
             </div>
-            <div className="font-semibold">{a.display_name}</div>
+            <div className="font-semibold">{hovered.display_name}</div>
             <div className="font-mono text-[11px] text-[#00FFCC]">
-              {a.floors} {a.floors === 1 ? "APPLICATION" : "APPLICATIONS"}
+              {hovered.floors} {hovered.floors === 1 ? "APPLICATION" : "APPLICATIONS"}
+              {hovered.floors >= SKYSCRAPER_FLOOR_THRESHOLD && " · POWER USER"}
             </div>
-            {a.has_github && (
+            {hovered.has_github && (
               <div className="font-mono text-[10px] text-white/50 mt-0.5">
-                ⌁ {a.github_commits_30d} commits / 30d
+                ⌁ {hovered.github_commits_30d} commits / 30d
               </div>
             )}
           </div>
         </Html>
       )}
     </group>
+  );
+}
+
+function ApplicantInstance({
+  a,
+  hovered,
+  selected,
+  highlighted,
+  dimmed,
+  onPointerOver,
+  onPointerOut,
+  onClick,
+}) {
+  const ref = useRef();
+  const baseColor = useMemo(() => new THREE.Color(a.color), [a.color]);
+  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.18), [baseColor]);
+  const selectedColor = useMemo(() => new THREE.Color("#00FFCC"), []);
+  const highlightColor = useMemo(() => new THREE.Color("#FF007F"), []);
+  const targetScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
+
+  useFrame((_, dt) => {
+    if (!ref.current) return;
+    const t = highlighted ? 1.15 : selected ? 1.08 : hovered ? 1.04 : 1.0;
+    targetScale.set(t, a.height, t);
+    ref.current.scale.lerp(targetScale, Math.min(1, dt * 8));
+    let target;
+    if (highlighted) target = highlightColor;
+    else if (selected) target = selectedColor;
+    else if (dimmed) target = dimmedColor;
+    else target = baseColor;
+    ref.current.color.lerp(target, Math.min(1, dt * 6));
+  });
+
+  return (
+    <Instance
+      ref={ref}
+      position={[a.x, a.height / 2, a.z]}
+      onPointerOver={(e) => {
+        e.stopPropagation();
+        onPointerOver?.();
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation();
+        onPointerOut?.();
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick?.();
+      }}
+    />
   );
 }

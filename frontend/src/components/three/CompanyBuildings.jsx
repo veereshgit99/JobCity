@@ -2,14 +2,13 @@ import { useMemo, useRef, useState } from "react";
 import { Html, Instance, Instances } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import Skyscraper from "./Skyscraper";
 import { project } from "@/lib/projection";
 
-/**
- * Render company buildings as a single InstancedMesh per the design guidelines.
- * One draw call for hundreds of buildings, with per-instance hover/click.
- */
+const SKYSCRAPER_FLOOR_THRESHOLD = 8;
+
 export default function CompanyBuildings({ cities, onCompanyClick, selected, query = "" }) {
-  const [hoverIdx, setHoverIdx] = useState(-1);
+  const [hoverKey, setHoverKey] = useState(null);
 
   const buildings = useMemo(() => {
     const out = [];
@@ -26,6 +25,7 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
           x: cx + r * Math.cos(angle),
           z: cz + r * Math.sin(angle),
           height: Math.max(co.floors * 1.6, 1.6),
+          key: `${c.city}-${co.id}-${i}`,
         });
       });
     }
@@ -33,50 +33,59 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
   }, [cities]);
 
   const q = (query || "").trim().toLowerCase();
-  const matchesQuery = (b) => {
-    if (!q) return true;
-    return (
-      b.name.toLowerCase().includes(q) ||
-      b.city.toLowerCase().includes(q) ||
-      b.state.toLowerCase().includes(q)
-    );
-  };
+  const matchesQuery = (b) =>
+    !q ||
+    b.name.toLowerCase().includes(q) ||
+    b.city.toLowerCase().includes(q) ||
+    b.state.toLowerCase().includes(q);
 
-  const hovered = hoverIdx >= 0 ? buildings[hoverIdx] : null;
+  const tall = buildings.filter((b) => b.floors >= SKYSCRAPER_FLOOR_THRESHOLD);
+  const regular = buildings.filter((b) => b.floors < SKYSCRAPER_FLOOR_THRESHOLD);
+
+  const hovered = buildings.find((b) => b.key === hoverKey);
 
   return (
     <group>
-      <Instances limit={Math.max(buildings.length, 8)} castShadow receiveShadow>
+      {/* Regular (short) buildings — single InstancedMesh */}
+      <Instances limit={Math.max(regular.length, 8)} castShadow receiveShadow>
         <boxGeometry args={[1.6, 1, 1.6]} />
-        <meshStandardMaterial
-          vertexColors={false}
-          roughness={0.45}
-          metalness={0.15}
-        />
-        {buildings.map((b, i) => (
+        <meshStandardMaterial roughness={0.45} metalness={0.15} />
+        {regular.map((b) => (
           <BuildingInstance
-            key={`${b.city}-${b.id}-${i}`}
+            key={b.key}
             b={b}
-            idx={i}
-            hovered={hoverIdx === i}
+            hovered={hoverKey === b.key}
             selected={selected && selected.id === b.id && selected.city === b.city}
             dimmed={q ? !matchesQuery(b) : false}
-            onPointerOver={() => {
-              setHoverIdx(i);
-              document.body.style.cursor = "pointer";
-            }}
-            onPointerOut={() => {
-              setHoverIdx((cur) => (cur === i ? -1 : cur));
-              document.body.style.cursor = "";
-            }}
+            onPointerOver={() => setHoverKey(b.key)}
+            onPointerOut={() => setHoverKey((cur) => (cur === b.key ? null : cur))}
             onClick={() => onCompanyClick?.(b)}
           />
         ))}
       </Instances>
 
+      {/* Skyscrapers — distinctive multi-tier geometry */}
+      {tall.map((b) => (
+        <Skyscraper
+          key={b.key}
+          position={[b.x, 0, b.z]}
+          height={b.height}
+          baseWidth={1.8}
+          color={b.color}
+          highlight={
+            hoverKey === b.key ||
+            (selected && selected.id === b.id && selected.city === b.city)
+          }
+          dim={q ? !matchesQuery(b) : false}
+          onClick={() => onCompanyClick?.(b)}
+          onPointerOver={() => setHoverKey(b.key)}
+          onPointerOut={() => setHoverKey((cur) => (cur === b.key ? null : cur))}
+        />
+      ))}
+
       {hovered && (
         <Html
-          position={[hovered.x, hovered.height + 0.8, hovered.z]}
+          position={[hovered.x, hovered.height + 1.2, hovered.z]}
           center
           style={{ pointerEvents: "none" }}
         >
@@ -87,6 +96,7 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
             <div className="font-semibold mt-0.5">{hovered.name}</div>
             <div className="font-mono text-[11px]" style={{ color: hovered.color }}>
               {hovered.floors} {hovered.floors === 1 ? "JOB" : "JOBS"}
+              {hovered.floors >= SKYSCRAPER_FLOOR_THRESHOLD && " · SKYSCRAPER"}
             </div>
           </div>
         </Html>
@@ -117,9 +127,8 @@ export default function CompanyBuildings({ cities, onCompanyClick, selected, que
   );
 }
 
-function BuildingInstance({ b, idx, hovered, selected, dimmed, onPointerOver, onPointerOut, onClick }) {
+function BuildingInstance({ b, hovered, selected, dimmed, onPointerOver, onPointerOut, onClick }) {
   const ref = useRef();
-  // Color (animated to white-emissive when hovered/selected)
   const targetScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
   const color = useMemo(() => new THREE.Color(b.color || "#FFB24C"), [b.color]);
   const dimmedColor = useMemo(() => color.clone().multiplyScalar(0.2), [color]);

@@ -2,10 +2,12 @@ import { Suspense, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ApplicantsCityScene from "@/components/three/ApplicantsCityScene";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 export default function ApplicantsCityPage() {
   const [compareIds, setCompareIds] = useState([]);
   const [hovered, setHovered] = useState(null);
+  const [query, setQuery] = useState("");
   const nav = useNavigate();
 
   const toggleCompare = (a) => {
@@ -23,14 +25,29 @@ export default function ApplicantsCityPage() {
         <ApplicantsCityScene
           onApplicantClick={toggleCompare}
           selectedIds={compareIds}
+          query={query}
         />
       </Suspense>
 
+      {/* Floating search */}
+      <div className="absolute top-20 left-4 z-20 pointer-events-auto">
+        <div className="glass rounded-full p-1 flex items-center pl-4 w-[300px]">
+          <Input
+            data-testid="applicants-search-input"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name, level (entry/mid/senior), github…"
+            className="bg-transparent border-0 focus-visible:ring-0 text-white placeholder:text-white/40"
+          />
+        </div>
+      </div>
+
       {/* Top guide */}
-      <div className="absolute top-20 left-4 z-20 pointer-events-auto glass rounded-2xl px-4 py-3 max-w-md">
+      <div className="absolute top-36 left-4 z-20 pointer-events-auto glass rounded-2xl px-4 py-3 max-w-md">
         <div className="label-mono text-[#00FFCC]">APPLICANTS CITY · GUIDE</div>
         <div className="text-sm text-white/70 mt-1">
-          Each tower is an applicant. Floors = job applications submitted. Antenna = active GitHub.
+          Each tower is an applicant. Floors = job applications submitted.
+          Towers with 8+ apps become skyscrapers. Antenna = active GitHub.
           Click towers to select up to 4 for comparison.
         </div>
       </div>
