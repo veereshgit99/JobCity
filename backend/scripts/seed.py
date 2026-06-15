@@ -72,27 +72,33 @@ async def _seed_admin_and_demo(db):
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-        applicant_id = f"app_{user_id.replace('user_', '')}"
-        await db.applicants.insert_one(
-            {
-                "applicant_id": applicant_id,
-                "user_id": user_id,
-                "display_name": "Demo Applicant",
-                "headline": "Demo user exploring JobCity",
-                "bio": "I exist so the testing agent has something to click.",
-                "experience_level": "mid",
-                "skills": ["React", "FastAPI", "MongoDB"],
-                "github_username": "demo",
-                "github_commits_30d": 142,
-                "location_city": "Seattle",
-                "location_state": "WA",
-                "avatar_url": "",
-                "building_seed": _seed_int(user_id),
-                "applications_count": 0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+    else:
+        user_id = demo["user_id"]
+
+    # ALWAYS upsert the demo applicants row so re-runs self-heal a missing/wiped profile.
+    applicant_id = f"app_{user_id.replace('user_', '')}"
+    await db.applicants.replace_one(
+        {"user_id": user_id},
+        {
+            "applicant_id": applicant_id,
+            "user_id": user_id,
+            "display_name": "Demo Applicant",
+            "headline": "Demo user exploring JobCity",
+            "bio": "I exist so the testing agent has something to click.",
+            "experience_level": "mid",
+            "skills": ["React", "FastAPI", "MongoDB"],
+            "github_username": "demo",
+            "github_commits_30d": 142,
+            "location_city": "Seattle",
+            "location_state": "WA",
+            "avatar_url": "",
+            "building_seed": _seed_int(user_id),
+            "applications_count": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        upsert=True,
+    )
 
 
 async def _seed_companies(db) -> int:
