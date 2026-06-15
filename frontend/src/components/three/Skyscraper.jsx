@@ -1,7 +1,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { getWindowTexture } from "@/lib/buildingTex";
+import { getWindowTexture, getGreenWindowTexture } from "@/lib/buildingTex";
 
 /**
  * Multi-tier skyscraper with windows and a glow point-light when highlighted.
@@ -14,6 +14,7 @@ export default function Skyscraper({
   color = "#FFB24C",
   highlight = false,
   dim = false,
+  variant = "warm", // "warm" (Jobs City) or "green" (Applicants City)
   onClick,
   onPointerOver,
   onPointerOut,
@@ -29,9 +30,13 @@ export default function Skyscraper({
   const w2 = baseWidth * 0.78;
   const w3 = baseWidth * 0.58;
 
-  const tex = useMemo(() => getWindowTexture(), []);
+  const tex = useMemo(
+    () => (variant === "green" ? getGreenWindowTexture() : getWindowTexture()),
+    [variant]
+  );
   const baseColor = useMemo(() => new THREE.Color(color), [color]);
-  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.15), [baseColor]);
+  // Dimmed skyscrapers should still be readable, not nearly black.
+  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.55), [baseColor]);
   const highlightColor = useMemo(() => new THREE.Color("#ffffff"), []);
 
   useFrame((_, dt) => {
@@ -46,7 +51,7 @@ export default function Skyscraper({
       const targetCol = highlight ? baseColor : dim ? dimmedColor : baseColor;
       mat.color.lerp(targetCol, Math.min(1, dt * 6));
       mat.emissive.lerp(highlight ? highlightColor : targetCol, Math.min(1, dt * 6));
-      mat.emissiveIntensity = highlight ? 1.2 : dim ? 0.05 : 0.35;
+      mat.emissiveIntensity = highlight ? 1.2 : dim ? 0.22 : 0.35;
     });
     if (lightRef.current) {
       lightRef.current.intensity += ((highlight ? 6 : 0) - lightRef.current.intensity) * Math.min(1, dt * 6);
@@ -107,11 +112,6 @@ export default function Skyscraper({
           emissiveMap-repeat-x={Math.max(1, Math.round(w3))}
           emissiveMap-repeat-y={Math.max(2, Math.round(h3 / 1.5))}
         />
-      </mesh>
-      {/* Spire */}
-      <mesh position={[0, height + 0.6, 0]} castShadow>
-        <cylinderGeometry args={[0.05, 0.05, 1.0, 6]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
       </mesh>
       {/* Glow light when selected/hovered */}
       <pointLight ref={lightRef} color={color} intensity={0} distance={18} position={[0, height * 0.6, 0]} />

@@ -36,7 +36,7 @@
 ## What's been implemented (through Feb 14, 2026 — iterations 1–3)
 - ✅ JWT email/password auth + Emergent Google session bridge
 - ✅ MongoDB models with UUID `user_id` (no ObjectId leakage), unique indexes
-- ✅ Seed script: 20 companies, ~351 templated jobs, 30 demo applicants, demo applications, admin + demo accounts
+- ✅ Seed script: 20 companies, ~404 templated jobs, 30 demo applicants, demo applications, admin + demo accounts
 - ✅ Real data ingestion: **RemoteOK + Greenhouse + Lever + YC/HN**, server-side **filter to Software/ML/Robotics only** (`services/job_filter.py`); ~763 active jobs split 118 software / 55 ML / 27 robotics across 38 companies. Auto-refresh every 6h.
 - ✅ Aggregation endpoints: `/api/jobs-city/buildings` and `/api/applicants-city/buildings`
 - ✅ 3D Jobs City — **sqrt-scaled building heights** (no more 167-floor monoliths), **procedural window textures on every building** (Canvas-generated, lit/unlit grid), **point-light glow on hover & selection**, InstancedMesh path for short buildings, multi-tier skyscrapers with spires for tall ones, search-bar dim
@@ -51,6 +51,33 @@
 - ✅ r3f patched to ignore `x-*` JSX props injected by visual-edits babel plugin
 - ✅ Deployment health check: PASS
 - ✅ Testing agent runs: **iter_1 (14/14 + e2e)**, **iter_2 (25/25 + e2e)**, **iter_3 (7/7 skyscraper + search e2e)** — all green
+
+## Iteration 4 — Feb 15, 2026 (this session)
+- ✅ Restored missing `.env` files (backend + frontend) after fork, added `.env.example` templates
+- ✅ JobDetail UX overhaul: AI brief (summary + required/nice-to-have skills) auto-loads on mount; "Score me" button removed; external Apply opens job portal in new tab; "Did you apply?" `AlertDialog` triggers on tab return via `visibilitychange` + `focus` listeners; seed jobs without `source_url` skip new-tab and open dialog directly
+- ✅ New `ApplicantRoads` component: horizontal + vertical asphalt strips with cyan neon center stripes form a grid between applicant towers (24×24, spacing 2.4)
+- ✅ Emergent LLM Key wired in — `/api/jobs/{id}/summary` and `/api/jobs/{id}/match-score` confirmed live with Claude Sonnet 4.5
+- ✅ Login.jsx defaults aligned with seed (`demo@jobcity.test` / `Demo123!`)
+- ✅ Visually verified via screenshot tool (frontend testing agent struggles with WebGL canvases)
+
+## Iteration 5 — Feb 15, 2026 (this session continued)
+- ✅ **CORS fix**: switched API axios client to `withCredentials: false` so Cloudflare's `Access-Control-Allow-Origin: *` override no longer breaks credentials-mode preflight in Emergent preview. Auth still works via Bearer token in localStorage.
+- ✅ **Applicants City revamp** — Sheet drawer side panel replaces nav to `/applicants/:id`; shows title, applications count, skills, GitHub stats, and clickable resume link only (no jobs list)
+- ✅ **Compare flow** — click = open side panel (focus glow only, no auto-select). "+ Add to compare" button in the side panel stacks up to 4 applicants; floating dock at the bottom shows chips with remove-X + "Compare side-by-side →" CTA
+- ✅ **Navigate to my tower** — top-right CTA visible only when logged in. Smoothly tweens camera + orbit-controls target to the user's building (ease-out cubic over ~1.25s) and opens its side panel.
+- ✅ **New `/onboarding` page** — collected after register: title (with suggestion chips), experience level toggle, skills (chip multi-input), resume URL. All fields optional with "Skip for now". Backed by `PATCH /api/applicants/me`.
+- ✅ Register flow now redirects to `/onboarding` instead of `/profile`.
+- ✅ **Visual overhaul** of Applicants City to match the user's "pixelated lo-fi green night-city" reference (background `#091a12`, `NearestFilter` pixel windows, bright APPLICANT_CITY_COLORS palette).
+- ✅ Backend `PATCH /api/applicants/me` endpoint accepts `title`, `headline`, `skills`, `resume_url`, `experience_level`.
+- ✅ Applicants schema gains `title` and `resume_url` (both optional).
+- ✅ `/api/applicants-city/buildings` response now includes `title` so it shows on hover tooltip + side panel.
+
+## Iteration 6 — Feb 15, 2026 (gitcity-style focus)
+- ✅ **Building grid collision fix** — `/api/applicants-city/buildings` now sorts by applications desc and uses a deterministic spiral walk to push duplicates to the nearest empty slot. Verified 32/32 unique slots in the seeded city.
+- ✅ **Removed antenna/spire lines** from both cities — Skyscraper.jsx no longer renders the cylinder spire; ApplicantBuildings.jsx no longer renders GitHub antennas.
+- ✅ **Click building → camera zoom + golden focus beam** — selecting a tower now triggers a "close" camera fly (offset `[+4, 8, +6]`), drops a tall pulsing yellow beam through the focused building with a spinning octahedral diamond marker on top and a ground halo. Surrounding regular towers fade to ~55% opacity (solo-mode), and skyscrapers dim via the existing dim path.
+- ✅ **Profile card redesign** (gitcity-inspired) — radial avatar, @handle, title, level letter (S/A/B) with linear gradient progress bar, role + GitHub tags, 3×2 stat grid (APPS · COMMITS/30D · SKILLS · LEVEL · STATUS · HIRABLE), skills chips, VIEW RESUME (gold), + COMPARE, GITHUB ↗ buttons.
+- ✅ **Search → fly-to-applicant** — pressing Enter in the search box matches the first applicant by name/title/level/github; on match: success toast + camera fly + focus panel; on no match: error toast "No applicant found matching X.".
 
 ## Test credentials
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)
