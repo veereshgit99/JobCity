@@ -22,16 +22,16 @@ def _slug(s: str) -> str:
 
 
 def _company_id(name: str) -> str:
-    return f"co_{hashlib.md5(name.encode()).hexdigest()[:10]}"
+    return f"co_{hashlib.md5(name.encode(), usedforsecurity=False).hexdigest()[:10]}"
 
 
 def _job_id(company_name: str, title: str, city: str, idx: int) -> str:
     src = f"{company_name}|{title}|{city}|{idx}"
-    return f"job_{hashlib.md5(src.encode()).hexdigest()[:14]}"
+    return f"job_{hashlib.md5(src.encode(), usedforsecurity=False).hexdigest()[:14]}"
 
 
 def _seed_int(s: str) -> int:
-    return int(hashlib.md5(s.encode()).hexdigest()[:8], 16)
+    return int(hashlib.md5(s.encode(), usedforsecurity=False).hexdigest()[:8], 16)
 
 
 async def _seed_admin_and_demo(db):
@@ -72,27 +72,33 @@ async def _seed_admin_and_demo(db):
                 "created_at": datetime.now(timezone.utc).isoformat(),
             }
         )
-        applicant_id = f"app_{user_id.replace('user_', '')}"
-        await db.applicants.insert_one(
-            {
-                "applicant_id": applicant_id,
-                "user_id": user_id,
-                "display_name": "Demo Applicant",
-                "headline": "Demo user exploring JobCity",
-                "bio": "I exist so the testing agent has something to click.",
-                "experience_level": "mid",
-                "skills": ["React", "FastAPI", "MongoDB"],
-                "github_username": "demo",
-                "github_commits_30d": 142,
-                "location_city": "Seattle",
-                "location_state": "WA",
-                "avatar_url": "",
-                "building_seed": _seed_int(user_id),
-                "applications_count": 0,
-                "created_at": datetime.now(timezone.utc).isoformat(),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }
-        )
+    else:
+        user_id = demo["user_id"]
+
+    # ALWAYS upsert the demo applicants row so re-runs self-heal a missing/wiped profile.
+    applicant_id = f"app_{user_id.replace('user_', '')}"
+    await db.applicants.replace_one(
+        {"user_id": user_id},
+        {
+            "applicant_id": applicant_id,
+            "user_id": user_id,
+            "display_name": "Demo Applicant",
+            "headline": "Demo user exploring JobCity",
+            "bio": "I exist so the testing agent has something to click.",
+            "experience_level": "mid",
+            "skills": ["React", "FastAPI", "MongoDB"],
+            "github_username": "demo",
+            "github_commits_30d": 142,
+            "location_city": "Seattle",
+            "location_state": "WA",
+            "avatar_url": "",
+            "building_seed": _seed_int(user_id),
+            "applications_count": 0,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
+        upsert=True,
+    )
 
 
 async def _seed_companies(db) -> int:
@@ -167,7 +173,7 @@ async def _seed_demo_applicants(db) -> int:
     n = 0
     for (display_name, headline, level, city, state, skills, has_gh, commits) in DEMO_APPLICANTS:
         # deterministic user_id from name
-        det = hashlib.md5(display_name.encode()).hexdigest()
+        det = hashlib.md5(display_name.encode(), usedforsecurity=False).hexdigest()
         user_id = f"user_{det[:12]}"
         applicant_id = f"app_{det[:12]}"
         email = f"{_slug(display_name)}@demo.jobcity"

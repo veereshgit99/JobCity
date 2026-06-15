@@ -70,7 +70,6 @@ export default function ApplicantBuildings({
       >
         <boxGeometry args={[1.3, 1, 1.3]} />
         <meshStandardMaterial
-          map={tex}
           emissiveMap={tex}
           emissive="#0a1a10"
           emissiveIntensity={0.95}

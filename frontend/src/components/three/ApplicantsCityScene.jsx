@@ -5,6 +5,32 @@ import * as THREE from "three";
 import ApplicantBuildings from "./ApplicantBuildings";
 import ApplicantRoads from "./ApplicantRoads";
 import { api } from "@/lib/api";
+import { getRoadTexture } from "@/lib/roadTex";
+
+const GROUND_SIZE = 140;
+
+function CityGround() {
+  const tex = useMemo(() => {
+    const t = getRoadTexture();
+    // Match repeat to ground size so each "tile" covers a 4x4 grid of slots (~10 units per tile)
+    t.repeat.set(GROUND_SIZE / 10, GROUND_SIZE / 10);
+    return t;
+  }, []);
+
+  return (
+    <mesh receiveShadow rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]}>
+      <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
+      <meshStandardMaterial
+        map={tex}
+        emissiveMap={tex}
+        emissive="#00FFCC"
+        emissiveIntensity={0.18}
+        roughness={0.85}
+        metalness={0.1}
+      />
+    </mesh>
+  );
+}
 
 const SPACING = 2.4;
 
