@@ -18,12 +18,15 @@ function CameraFly({ flyTarget, controlsRef }) {
 
   useEffect(() => {
     if (!flyTarget) return;
-    const [tx, tz] = flyTarget;
+    const [tx, tz, zoom] = flyTarget;
     const startPos = camera.position.clone();
     const startTarget = controlsRef.current?.target?.clone() || new THREE.Vector3(0, 0, 0);
-    // Aim ~10 units above & 12 units back from the tower
-    const endTarget = new THREE.Vector3(tx, 2, tz);
-    const endPos = new THREE.Vector3(tx + 8, 14, tz + 12);
+    // "close" = right next to the tower (selection view), "medium" = overview
+    const offsets = zoom === "close"
+      ? { dx: 4, dy: 8, dz: 6, ty: 3 }
+      : { dx: 8, dy: 14, dz: 12, ty: 2 };
+    const endTarget = new THREE.Vector3(tx, offsets.ty, tz);
+    const endPos = new THREE.Vector3(tx + offsets.dx, offsets.dy, tz + offsets.dz);
     tweenRef.current = { t: 0, startPos, endPos, startTarget, endTarget };
   }, [flyTarget, camera, controlsRef]);
 

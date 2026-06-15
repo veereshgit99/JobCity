@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import ApplicantsCityScene from "@/components/three/ApplicantsCityScene";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
@@ -15,16 +15,22 @@ export default function ApplicantsCityPage() {
   const nav = useNavigate();
 
   const [applicants, setApplicants] = useState([]);
-  const [focus, setFocus] = useState(null); // applicant in side panel
+  const [focus, setFocus] = useState(null);
   const [compareIds, setCompareIds] = useState([]);
   const [query, setQuery] = useState("");
   const [flyTarget, setFlyTarget] = useState(null);
 
   const handleApplicantsLoaded = useCallback((list) => setApplicants(list), []);
 
-  const onBuildingClick = (a) => {
+  // Camera fly + open panel; pass `zoom` to control how close the camera lands.
+  const flyToBuilding = (a, { zoom = "close" } = {}) => {
+    const x = a.grid_x * SPACING;
+    const z = a.grid_z * SPACING;
+    setFlyTarget([x, z, zoom, Date.now()]);
     setFocus(a);
   };
+
+  const onBuildingClick = (a) => flyToBuilding(a, { zoom: "close" });
 
   const addToCompare = (a) => {
     setCompareIds((prev) => {
@@ -54,12 +60,28 @@ export default function ApplicantsCityPage() {
       toast.error("Couldn't find your tower yet.");
       return;
     }
-    setFlyTarget([myBuilding.grid_x * SPACING, myBuilding.grid_z * SPACING, Date.now()]);
-    setFocus(myBuilding);
-    toast("Flying to your tower…", { duration: 1500 });
+    flyToBuilding(myBuilding, { zoom: "medium" });
   };
 
-  // Build a quick lookup for the compare dock
+  // Search → find first match, fly to it
+  const onSearchSubmit = (e) => {
+    if (e.key !== "Enter") return;
+    const q = query.trim().toLowerCase();
+    if (!q) return;
+    const match = applicants.find((a) => {
+      const fields = [a.display_name, a.title, a.experience_level, a.has_github ? "github" : ""]
+        .filter(Boolean)
+        .map((s) => String(s).toLowerCase());
+      return fields.some((f) => f.includes(q));
+    });
+    if (!match) {
+      toast.error(`No applicant found matching "${query}".`);
+      return;
+    }
+    toast.success(`Found ${match.display_name}.`);
+    flyToBuilding(match, { zoom: "close" });
+  };
+
   const idToApplicant = useMemo(() => {
     const m = new Map();
     applicants.forEach((a) => m.set(a.id, a));
@@ -79,20 +101,20 @@ export default function ApplicantsCityPage() {
         />
       </Suspense>
 
-      {/* Floating search */}
+      {/* Floating search (Enter to fly to first match) */}
       <div className="absolute top-20 left-4 z-20 pointer-events-auto">
         <div className="glass rounded-full p-1 flex items-center pl-4 w-[320px]">
           <Input
             data-testid="applicants-search-input"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search name, title, level, github…"
+            onKeyDown={onSearchSubmit}
+            placeholder="Search name, title, level… (Enter to fly)"
             className="bg-transparent border-0 focus-visible:ring-0 text-white placeholder:text-white/40"
           />
         </div>
       </div>
 
-      {/* Navigate-me button */}
       {meApplicant && (
         <div className="absolute top-20 right-4 z-20 pointer-events-auto">
           <Button
@@ -105,16 +127,14 @@ export default function ApplicantsCityPage() {
         </div>
       )}
 
-      {/* Top guide */}
       <div className="absolute top-36 left-4 z-20 pointer-events-auto glass rounded-2xl px-4 py-3 max-w-md">
         <div className="label-mono text-[#5BE3A3]">APPLICANTS CITY · GUIDE</div>
         <div className="text-sm text-white/70 mt-1">
-          Each tower is an applicant. Floors = job applications. Tap a tower to inspect.
-          Use “+ Add to compare” on up to 4 towers to compare side-by-side.
+          Tap a tower to focus. Search and press Enter to fly to a user.
+          Use “+ Add to compare” on up to 4 towers.
         </div>
       </div>
 
-      {/* Compare dock */}
       {compareIds.length > 0 && (
         <div
           data-testid="compare-bar"
@@ -170,7 +190,6 @@ export default function ApplicantsCityPage() {
         </div>
       )}
 
-      {/* Side panel (Sheet) */}
       <ApplicantSidePanel
         applicant={focus}
         onClose={() => setFocus(null)}
@@ -204,124 +223,179 @@ function ApplicantSidePanel({ applicant, onClose, onAddCompare, inCompareSet, co
   const color = APPLICANT_CITY_COLORS[applicant.experience_level] || APPLICANT_CITY_COLORS.entry;
   const skills = detail?.skills || [];
   const resumeUrl = detail?.resume_url || "";
-  const title = detail?.title || applicant.title || "";
+  const title = (detail?.title || applicant.title || "").toUpperCase();
+  const handle = (detail?.github_username || applicant.display_name?.split(" ").join("").toLowerCase() || "user");
+  const commits = applicant.github_commits_30d || 0;
+  const apps = applicant.floors;
 
   return (
     <Sheet open={!!applicant} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         data-testid="applicant-side-panel"
         side="right"
-        className="bg-[#06120b]/95 backdrop-blur-2xl border-l border-[#5BE3A3]/15 text-white w-full sm:max-w-md"
+        className="bg-[#0a1a10]/95 backdrop-blur-2xl border-l border-[#5BE3A3]/15 text-white w-full sm:max-w-sm p-0 overflow-y-auto"
       >
-        <SheetHeader className="pb-2">
+        {/* Top ESC hint */}
+        <div className="absolute top-3 right-4 label-mono text-white/40">ESC</div>
+
+        {/* Header */}
+        <div className="px-5 pt-6">
           <div className="flex items-center gap-3">
             <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center font-[Unbounded] text-2xl font-black"
+              className="w-14 h-14 rounded-full flex items-center justify-center font-[Unbounded] text-2xl font-black border-2"
               style={{
-                background: color,
+                background: `radial-gradient(circle at 30% 30%, ${color}, #0a1a10)`,
+                borderColor: color,
                 color: "#0b1a10",
-                boxShadow: `0 0 24px ${color}55`,
+                boxShadow: `0 0 24px ${color}66`,
               }}
               data-testid="applicant-avatar-block"
             >
               {applicant.display_name?.[0] || "?"}
             </div>
-            <div className="flex-1 text-left">
-              <div className="label-mono" style={{ color }}>
-                {applicant.experience_level.toUpperCase()}
-                {title && ` · ${title.toUpperCase()}`}
-              </div>
-              <SheetTitle
-                className="font-[Unbounded] text-2xl font-black text-white text-left"
+            <div className="flex-1 min-w-0">
+              <div
+                className="font-[Unbounded] text-lg font-bold tracking-wide uppercase truncate"
                 data-testid="applicant-name"
               >
                 {applicant.display_name}
-              </SheetTitle>
-            </div>
-          </div>
-        </SheetHeader>
-
-        {/* Stats row */}
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="glass rounded-2xl p-4">
-            <div className="label-mono text-white/50">APPLICATIONS</div>
-            <div
-              className="font-mono text-3xl font-bold mt-1"
-              style={{ color: "#5BE3A3" }}
-              data-testid="applicant-applications-count"
-            >
-              {applicant.floors}
-            </div>
-          </div>
-          <div className="glass rounded-2xl p-4">
-            <div className="label-mono text-white/50">GITHUB</div>
-            <div className="font-mono text-base font-semibold mt-1 text-white truncate">
-              {applicant.has_github ? `${applicant.github_commits_30d} / 30d` : "—"}
-            </div>
-          </div>
-        </div>
-
-        {/* Skills */}
-        <div className="mt-4">
-          <div className="label-mono text-white/50">SKILLS</div>
-          {loading && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              <div className="h-6 w-16 bg-white/5 rounded-full animate-pulse" />
-              <div className="h-6 w-20 bg-white/5 rounded-full animate-pulse" />
-              <div className="h-6 w-12 bg-white/5 rounded-full animate-pulse" />
-            </div>
-          )}
-          {!loading && skills.length === 0 && (
-            <div className="mt-1 text-white/40 text-sm">— not provided</div>
-          )}
-          {!loading && skills.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-2" data-testid="applicant-skills-list">
-              {skills.map((s) => (
-                <span
-                  key={s}
-                  className="px-3 py-1 rounded-full text-xs font-mono bg-[#5BE3A3]/10 text-[#5BE3A3] border border-[#5BE3A3]/30"
+              </div>
+              <div className="font-mono text-xs text-white/55 truncate">@{handle}</div>
+              {title && (
+                <div
+                  className="font-mono text-[10px] tracking-widest mt-0.5"
+                  style={{ color: "#FF6B6B" }}
                 >
-                  {s}
-                </span>
-              ))}
+                  {title}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Resume */}
-        <div className="mt-4">
-          <div className="label-mono text-white/50">RESUME</div>
-          {resumeUrl ? (
-            <a
-              data-testid="applicant-resume-link"
-              href={resumeUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#5BE3A3]/10 text-[#5BE3A3] border border-[#5BE3A3]/30 hover:bg-[#5BE3A3]/20 transition text-sm font-mono"
+          {/* Level / experience bar */}
+          <div className="mt-4 flex items-center gap-2">
+            <div
+              className="w-8 h-8 rounded border-2 flex items-center justify-center font-mono text-sm font-bold"
+              style={{ borderColor: "#5BE3A3", color: "#5BE3A3" }}
             >
-              View resume ↗
-            </a>
-          ) : (
-            <div className="mt-1 text-white/40 text-sm">— not provided</div>
-          )}
-        </div>
+              {apps >= 8 ? "S" : apps >= 4 ? "A" : "B"}
+            </div>
+            <div className="flex-1">
+              <div className="label-mono text-[10px] text-white/50 mb-0.5">
+                {applicant.experience_level.toUpperCase()} · {apps >= 8 ? "POWER USER" : "BUILDING UP"}
+              </div>
+              <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${Math.min(apps * 10, 100)}%`,
+                    background: "linear-gradient(90deg, #5BE3A3, #FFD23F)",
+                  }}
+                />
+              </div>
+            </div>
+          </div>
 
-        {/* Compare action */}
-        <div className="mt-6 pt-4 border-t border-white/5">
-          <Button
-            data-testid="add-to-compare-btn"
-            onClick={onAddCompare}
-            disabled={inCompareSet || compareFull}
-            className="w-full rounded-full bg-[#5BE3A3] text-black hover:bg-[#5BE3A3]/90 disabled:bg-white/10 disabled:text-white/40"
-          >
-            {inCompareSet
-              ? "Already in compare"
-              : compareFull
-              ? "Compare set full (4/4)"
-              : "+ Add to compare"}
-          </Button>
+          {/* Role/tag */}
+          <div className="mt-4 flex flex-wrap gap-1.5">
+            <span
+              className="px-2.5 py-1 rounded text-[10px] font-mono tracking-widest uppercase border"
+              style={{ borderColor: "#FF6B6B", color: "#FF6B6B", background: "#FF6B6B22" }}
+            >
+              {applicant.experience_level}
+            </span>
+            {applicant.has_github && (
+              <span className="px-2.5 py-1 rounded text-[10px] font-mono tracking-widest uppercase border border-[#5BE3A3]/40 text-[#5BE3A3] bg-[#5BE3A3]/10">
+                GitHub
+              </span>
+            )}
+          </div>
+
+          {/* Stat grid (3 cols x 2 rows) */}
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            <StatTile label="APPS" value={apps} testid="applicant-applications-count" />
+            <StatTile label="COMMITS/30D" value={commits} />
+            <StatTile label="SKILLS" value={skills.length || (loading ? "…" : 0)} />
+            <StatTile label="LEVEL" value={apps >= 8 ? "S" : apps >= 4 ? "A" : "B"} />
+            <StatTile label="STATUS" value={apps >= 8 ? "HOT" : "—"} />
+            <StatTile label="HIRABLE" value={skills.length >= 3 ? "YES" : "—"} />
+          </div>
+
+          {/* Skills chips */}
+          <div className="mt-4">
+            <div className="label-mono text-white/50">SKILLS</div>
+            {loading ? (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="h-5 w-12 bg-white/5 rounded animate-pulse" />
+                <div className="h-5 w-16 bg-white/5 rounded animate-pulse" />
+                <div className="h-5 w-10 bg-white/5 rounded animate-pulse" />
+              </div>
+            ) : skills.length === 0 ? (
+              <div className="mt-1 text-white/40 text-sm">— not provided</div>
+            ) : (
+              <div className="mt-2 flex flex-wrap gap-1.5" data-testid="applicant-skills-list">
+                {skills.map((s) => (
+                  <span
+                    key={s}
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#5BE3A3]/10 text-[#5BE3A3] border border-[#5BE3A3]/30"
+                  >
+                    {s}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="mt-5 space-y-2 pb-6">
+            {resumeUrl ? (
+              <a
+                data-testid="applicant-resume-link"
+                href={resumeUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center py-3 rounded font-mono text-xs tracking-widest uppercase bg-[#FFD23F] text-black hover:bg-[#FFD23F]/90 transition"
+              >
+                View Resume ↗
+              </a>
+            ) : (
+              <div className="block w-full text-center py-3 rounded font-mono text-xs tracking-widest uppercase bg-white/5 text-white/30 cursor-not-allowed">
+                No resume linked
+              </div>
+            )}
+            <Button
+              data-testid="add-to-compare-btn"
+              onClick={onAddCompare}
+              disabled={inCompareSet || compareFull}
+              className="w-full rounded font-mono text-xs tracking-widest uppercase bg-transparent border border-white/15 text-white hover:bg-white/5 disabled:opacity-40"
+            >
+              {inCompareSet ? "In compare" : compareFull ? "Compare full" : "+ Compare"}
+            </Button>
+            {applicant.has_github && (
+              <a
+                href={`https://github.com/${detail?.github_username || handle}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center py-3 rounded font-mono text-xs tracking-widest uppercase bg-transparent border border-white/15 text-white hover:bg-white/5"
+              >
+                GitHub ↗
+              </a>
+            )}
+          </div>
         </div>
       </SheetContent>
     </Sheet>
+  );
+}
+
+function StatTile({ label, value, testid }) {
+  return (
+    <div
+      className="rounded border border-white/10 bg-black/30 py-2 px-1.5 text-center"
+      data-testid={testid}
+    >
+      <div className="font-mono text-base font-bold text-[#FFD23F] leading-tight">{value}</div>
+      <div className="label-mono text-[9px] text-white/45 mt-0.5">{label}</div>
+    </div>
   );
 }

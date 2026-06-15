@@ -8,6 +8,7 @@ import { getGreenWindowTexture, floorsToHeight } from "@/lib/buildingTex";
 
 const SPACING = 2.4;
 const SKYSCRAPER_FLOOR_THRESHOLD = 8;
+const BEAM_COLOR = "#FFD23F";
 
 export default function ApplicantBuildings({
   applicants,
@@ -49,6 +50,11 @@ export default function ApplicantBuildings({
     return fields.some((f) => f.includes(q));
   };
 
+  // When a building is focused, all others read as "dimmed" (solo spotlight effect)
+  const soloMode = !!focusId;
+  const isDim = (a) =>
+    (q && !matchesQuery(a)) || (soloMode && a.id !== focusId);
+
   const tall = buildings.filter((a) => a.floors >= SKYSCRAPER_FLOOR_THRESHOLD);
   const regular = buildings.filter((a) => a.floors < SKYSCRAPER_FLOOR_THRESHOLD);
   const hovered = buildings.find((a) => a.id === hoverId);
@@ -56,8 +62,12 @@ export default function ApplicantBuildings({
 
   return (
     <group>
-      {/* Regular towers — InstancedMesh with bright pixel windows */}
-      <Instances limit={Math.max(regular.length, 8)} castShadow receiveShadow>
+      {/* Regular towers — InstancedMesh with pixel windows */}
+      <Instances
+        limit={Math.max(regular.length, 8)}
+        castShadow
+        receiveShadow
+      >
         <boxGeometry args={[1.3, 1, 1.3]} />
         <meshStandardMaterial
           map={tex}
@@ -66,6 +76,8 @@ export default function ApplicantBuildings({
           emissiveIntensity={0.95}
           roughness={0.55}
           metalness={0.15}
+          transparent={soloMode}
+          opacity={soloMode ? 0.55 : 1.0}
           map-repeat-x={2}
           map-repeat-y={3}
           emissiveMap-repeat-x={2}
@@ -78,7 +90,7 @@ export default function ApplicantBuildings({
             hovered={hoverId === a.id || focusId === a.id}
             selected={selectedIds.includes(a.id)}
             highlighted={highlightId === a.id}
-            dimmed={q ? !matchesQuery(a) : false}
+            dimmed={isDim(a)}
             onPointerOver={() => setHoverId(a.id)}
             onPointerOut={() => setHoverId((cur) => (cur === a.id ? null : cur))}
             onClick={() => onClick?.(a)}
@@ -86,7 +98,7 @@ export default function ApplicantBuildings({
         ))}
       </Instances>
 
-      {/* Glow lights */}
+      {/* Bright glow over hovered/focused regular tower */}
       {hovered && hovered.floors < SKYSCRAPER_FLOOR_THRESHOLD && (
         <pointLight
           color={hovered.color}
@@ -97,65 +109,49 @@ export default function ApplicantBuildings({
       )}
       {focused && focused.floors < SKYSCRAPER_FLOOR_THRESHOLD && (
         <pointLight
-          color={"#FFD23F"}
-          intensity={6}
-          distance={20}
+          color={BEAM_COLOR}
+          intensity={7}
+          distance={24}
           position={[focused.x, focused.height + 1, focused.z]}
         />
       )}
 
       {/* Skyscrapers */}
       {tall.map((a) => (
-        <group key={a.id}>
-          <Skyscraper
-            position={[a.x, 0, a.z]}
-            height={a.height}
-            baseWidth={1.5}
-            variant="green"
-            color={
-              highlightId === a.id
-                ? "#FF007F"
-                : focusId === a.id
-                ? "#FFD23F"
-                : selectedIds.includes(a.id)
-                ? "#5BE3A3"
-                : a.color
-            }
-            highlight={
-              hoverId === a.id ||
-              selectedIds.includes(a.id) ||
-              highlightId === a.id ||
-              focusId === a.id
-            }
-            dim={q ? !matchesQuery(a) : false}
-            onClick={() => onClick?.(a)}
-            onPointerOver={() => setHoverId(a.id)}
-            onPointerOut={() => setHoverId((cur) => (cur === a.id ? null : cur))}
-          />
-          {a.has_github && (
-            <mesh position={[a.x, a.height + 1.8, a.z]} castShadow>
-              <cylinderGeometry args={[0.06, 0.06, 1.2, 6]} />
-              <meshStandardMaterial color="#5BE3A3" emissive="#5BE3A3" emissiveIntensity={1.0} />
-            </mesh>
-          )}
-        </group>
+        <Skyscraper
+          key={a.id}
+          position={[a.x, 0, a.z]}
+          height={a.height}
+          baseWidth={1.5}
+          variant="green"
+          color={
+            highlightId === a.id
+              ? "#FF007F"
+              : focusId === a.id
+              ? BEAM_COLOR
+              : selectedIds.includes(a.id)
+              ? "#5BE3A3"
+              : a.color
+          }
+          highlight={
+            hoverId === a.id ||
+            selectedIds.includes(a.id) ||
+            highlightId === a.id ||
+            focusId === a.id
+          }
+          dim={isDim(a)}
+          onClick={() => onClick?.(a)}
+          onPointerOver={() => setHoverId(a.id)}
+          onPointerOut={() => setHoverId((cur) => (cur === a.id ? null : cur))}
+        />
       ))}
 
-      {/* GitHub antennas on regular towers */}
-      {regular
-        .filter((a) => a.has_github)
-        .map((a) => (
-          <mesh
-            key={`ant-${a.id}`}
-            position={[a.x, a.height + 0.55, a.z]}
-            castShadow
-          >
-            <cylinderGeometry args={[0.04, 0.04, 0.9, 6]} />
-            <meshStandardMaterial color="#5BE3A3" emissive="#5BE3A3" emissiveIntensity={0.9} />
-          </mesh>
-        ))}
+      {/* Golden focus beam — a tall vertical light marker on the selected building */}
+      {focused && (
+        <FocusBeam x={focused.x} z={focused.z} baseHeight={focused.height} />
+      )}
 
-      {hovered && (
+      {hovered && hovered.id !== focusId && (
         <Html
           position={[hovered.x, hovered.height + 1.5, hovered.z]}
           center
@@ -171,14 +167,70 @@ export default function ApplicantBuildings({
               {hovered.floors} {hovered.floors === 1 ? "APPLICATION" : "APPLICATIONS"}
               {hovered.floors >= SKYSCRAPER_FLOOR_THRESHOLD && " · POWER USER"}
             </div>
-            {hovered.has_github && (
-              <div className="font-mono text-[10px] text-white/50 mt-0.5">
-                ⌁ {hovered.github_commits_30d} commits / 30d
-              </div>
-            )}
           </div>
         </Html>
       )}
+    </group>
+  );
+}
+
+/**
+ * Tall vertical light beam + diamond marker on top of the focused building.
+ * Inspired by thegitcity.com's "selection lighthouse" look.
+ */
+function FocusBeam({ x, z, baseHeight }) {
+  const beamRef = useRef();
+  const diamondRef = useRef();
+  const beamH = 28;
+  const beamY = baseHeight + beamH / 2 + 0.5;
+  const diamondY = baseHeight + 2.2;
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (beamRef.current) {
+      beamRef.current.material.opacity = 0.55 + Math.sin(t * 2.2) * 0.12;
+    }
+    if (diamondRef.current) {
+      diamondRef.current.rotation.y = t * 0.9;
+      const s = 1 + Math.sin(t * 2) * 0.06;
+      diamondRef.current.scale.setScalar(s);
+    }
+  });
+
+  return (
+    <group position={[x, 0, z]}>
+      {/* Beam */}
+      <mesh ref={beamRef} position={[0, beamY, 0]} renderOrder={5}>
+        <cylinderGeometry args={[0.18, 0.05, beamH, 8, 1, true]} />
+        <meshBasicMaterial
+          color={BEAM_COLOR}
+          transparent
+          opacity={0.6}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+      {/* Inner brighter core */}
+      <mesh position={[0, beamY, 0]} renderOrder={6}>
+        <cylinderGeometry args={[0.06, 0.02, beamH, 6, 1, true]} />
+        <meshBasicMaterial color="#FFF1AC" transparent opacity={0.95} depthWrite={false} />
+      </mesh>
+      {/* Diamond marker */}
+      <mesh ref={diamondRef} position={[0, diamondY, 0]} rotation={[0, 0, Math.PI / 4]}>
+        <octahedronGeometry args={[0.5, 0]} />
+        <meshStandardMaterial
+          color={BEAM_COLOR}
+          emissive={BEAM_COLOR}
+          emissiveIntensity={1.6}
+          metalness={0.4}
+          roughness={0.2}
+        />
+      </mesh>
+      {/* Ground halo */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]}>
+        <ringGeometry args={[1.4, 2.2, 32]} />
+        <meshBasicMaterial color={BEAM_COLOR} transparent opacity={0.35} />
+      </mesh>
     </group>
   );
 }
@@ -195,10 +247,9 @@ function ApplicantInstance({
 }) {
   const ref = useRef();
   const baseColor = useMemo(() => new THREE.Color(a.color), [a.color]);
-  // Even dimmed towers keep some luminance so they never read as black.
-  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.7), [baseColor]);
+  const dimmedColor = useMemo(() => baseColor.clone().multiplyScalar(0.4), [baseColor]);
   const selectedColor = useMemo(() => new THREE.Color("#5BE3A3"), []);
-  const focusColor = useMemo(() => new THREE.Color("#FFD23F"), []);
+  const focusColor = useMemo(() => new THREE.Color(BEAM_COLOR), []);
   const highlightColor = useMemo(() => new THREE.Color("#FF007F"), []);
   const targetScale = useMemo(() => new THREE.Vector3(1, 1, 1), []);
 

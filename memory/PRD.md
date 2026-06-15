@@ -67,16 +67,17 @@
 - ✅ **Navigate to my tower** — top-right CTA visible only when logged in. Smoothly tweens camera + orbit-controls target to the user's building (ease-out cubic over ~1.25s) and opens its side panel.
 - ✅ **New `/onboarding` page** — collected after register: title (with suggestion chips), experience level toggle, skills (chip multi-input), resume URL. All fields optional with "Skip for now". Backed by `PATCH /api/applicants/me`.
 - ✅ Register flow now redirects to `/onboarding` instead of `/profile`.
-- ✅ **Visual overhaul** of Applicants City to match the user's "pixelated lo-fi green night-city" reference:
-  - Background `#091a12` (deep forest-green), fog matched
-  - New `APPLICANT_CITY_COLORS` palette — bright mint/amber/orange so no building is invisible
-  - Brighter dim multiplier (`× 0.7` instead of `× 0.6`) — towers never read as black
-  - New `getGreenWindowTexture()` — pixelated `NearestFilter` neon-green / amber / dark-green window grid
-  - Skyscrapers in Applicants City now accept `variant="green"` to use the same lo-fi texture
-  - Roads now use dark forest-green base with neon-green stripes
-- ✅ Backend `PATCH /api/applicants/me` endpoint accepts `title`, `headline`, `skills`, `resume_url`, `experience_level`
-- ✅ Applicants schema gains `title` and `resume_url` (both optional)
-- ✅ `/api/applicants-city/buildings` response now includes `title` so it shows on hover tooltip + side panel
+- ✅ **Visual overhaul** of Applicants City to match the user's "pixelated lo-fi green night-city" reference (background `#091a12`, `NearestFilter` pixel windows, bright APPLICANT_CITY_COLORS palette).
+- ✅ Backend `PATCH /api/applicants/me` endpoint accepts `title`, `headline`, `skills`, `resume_url`, `experience_level`.
+- ✅ Applicants schema gains `title` and `resume_url` (both optional).
+- ✅ `/api/applicants-city/buildings` response now includes `title` so it shows on hover tooltip + side panel.
+
+## Iteration 6 — Feb 15, 2026 (gitcity-style focus)
+- ✅ **Building grid collision fix** — `/api/applicants-city/buildings` now sorts by applications desc and uses a deterministic spiral walk to push duplicates to the nearest empty slot. Verified 32/32 unique slots in the seeded city.
+- ✅ **Removed antenna/spire lines** from both cities — Skyscraper.jsx no longer renders the cylinder spire; ApplicantBuildings.jsx no longer renders GitHub antennas.
+- ✅ **Click building → camera zoom + golden focus beam** — selecting a tower now triggers a "close" camera fly (offset `[+4, 8, +6]`), drops a tall pulsing yellow beam through the focused building with a spinning octahedral diamond marker on top and a ground halo. Surrounding regular towers fade to ~55% opacity (solo-mode), and skyscrapers dim via the existing dim path.
+- ✅ **Profile card redesign** (gitcity-inspired) — radial avatar, @handle, title, level letter (S/A/B) with linear gradient progress bar, role + GitHub tags, 3×2 stat grid (APPS · COMMITS/30D · SKILLS · LEVEL · STATUS · HIRABLE), skills chips, VIEW RESUME (gold), + COMPARE, GITHUB ↗ buttons.
+- ✅ **Search → fly-to-applicant** — pressing Enter in the search box matches the first applicant by name/title/level/github; on match: success toast + camera fly + focus panel; on no match: error toast "No applicant found matching X.".
 
 ## Test credentials
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)

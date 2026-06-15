@@ -120,11 +120,6 @@ export default function Skyscraper({
           emissiveMap-repeat-y={Math.max(2, Math.round(h3 / 1.5))}
         />
       </mesh>
-      {/* Spire */}
-      <mesh position={[0, height + 0.6, 0]} castShadow>
-        <cylinderGeometry args={[0.05, 0.05, 1.0, 6]} />
-        <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.9} />
-      </mesh>
       {/* Glow light when selected/hovered */}
       <pointLight ref={lightRef} color={color} intensity={0} distance={18} position={[0, height * 0.6, 0]} />
     </group>

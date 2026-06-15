@@ -60,7 +60,11 @@ async def get_applicant(applicant_id: str):
 
 @router.get("/applicants-city/buildings")
 async def applicants_city_buildings():
-    """Return the 3D grid data for the Applicants City."""
+    """Return the 3D grid data for the Applicants City.
+
+    If two applicants hash to the same grid slot we spiral outward to the
+    nearest free slot so no two towers ever overlap.
+    """
     db = get_db()
     cursor = db.applicants.find(
         {},
@@ -78,10 +82,35 @@ async def applicants_city_buildings():
         },
     )
     items = await cursor.to_list(length=2000)
+
+    # Sort by applications desc so power users land on their original slot
+    items.sort(key=lambda a: -int(a.get("applications_count", 0) or 0))
+
+    # Pre-computed spiral offsets (concentric rings of squares)
+    spiral: list[tuple[int, int]] = [(0, 0)]
+    for r in range(1, GRID_SIZE):
+        for dx in range(-r, r + 1):
+            spiral.append((dx, -r))
+            spiral.append((dx, r))
+        for dz in range(-r + 1, r):
+            spiral.append((-r, dz))
+            spiral.append((r, dz))
+
+    occupied: set[tuple[int, int]] = set()
+    half = GRID_SIZE // 2
     out = []
     for a in items:
         seed = int(a.get("building_seed") or 0)
-        x, z = _slot_for(seed)
+        bx, bz = _slot_for(seed)
+        x, z = bx, bz
+        for dx, dz in spiral:
+            cx, cz = bx + dx, bz + dz
+            if cx < -half or cx >= half or cz < -half or cz >= half:
+                continue
+            if (cx, cz) not in occupied:
+                x, z = cx, cz
+                break
+        occupied.add((x, z))
         out.append(
             {
                 "id": a["applicant_id"],
