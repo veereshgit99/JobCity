@@ -18,9 +18,28 @@ async def list_jobs(
     company_id: Optional[str] = None,
     remote: Optional[bool] = None,
     q: Optional[str] = None,
+    role: Optional[str] = None,
+    tech: Optional[str] = Query(
+        None,
+        description="Comma-separated tech stack tags; matches ANY (e.g. 'React,Python').",
+    ),
+    level: Optional[str] = Query(
+        None, description="entry | mid | senior (case-insensitive)."
+    ),
+    posted_within: Optional[str] = Query(
+        None,
+        description="e.g. '24h', '7d', '30d' — only jobs posted within that window.",
+    ),
+    source: Optional[str] = Query(
+        None, description="greenhouse | lever | ashby | workable | recruitee"
+    ),
     limit: int = Query(50, le=200),
     offset: int = 0,
 ):
+    """List active jobs with rich filters.
+
+    All filters compose via AND. `tech` is OR-of-comma-separated values.
+    """
     db = get_db()
     query: dict = {"is_active": True}
     if city:
@@ -31,17 +50,86 @@ async def list_jobs(
         query["company_id"] = company_id
     if remote is not None:
         query["remote"] = remote
+    if source:
+        query["source"] = source.lower().strip()
+    if level:
+        lv = level.lower().strip()
+        if lv in ("entry", "mid", "senior"):
+            query["level"] = lv
+    if role:
+        rx = literal_regex(role)
+        query["title"] = {"$regex": rx, "$options": "i"}
+    if tech:
+        tags = [t.strip() for t in tech.split(",") if t.strip()]
+        if tags:
+            # case-insensitive match against the skills array
+            query["skills"] = {"$in": [{"$regex": f"^{literal_regex(t)}$", "$options": "i"} for t in tags]}
+            # Mongo `$in` doesn't accept regex docs; rewrite with $elemMatch+$or
+            del query["skills"]
+            query["$and"] = query.get("$and", []) + [
+                {
+                    "$or": [
+                        {"skills": {"$regex": f"^{literal_regex(t)}$", "$options": "i"}}
+                        for t in tags
+                    ]
+                }
+            ]
+    if posted_within:
+        from datetime import datetime, timedelta, timezone
+        unit = posted_within.strip().lower()
+        delta = None
+        try:
+            if unit.endswith("h"):
+                delta = timedelta(hours=int(unit[:-1]))
+            elif unit.endswith("d"):
+                delta = timedelta(days=int(unit[:-1]))
+            elif unit.endswith("w"):
+                delta = timedelta(weeks=int(unit[:-1]))
+        except ValueError:
+            delta = None
+        if delta is not None:
+            cutoff = (datetime.now(timezone.utc) - delta).isoformat()
+            query["posted_at"] = {"$gte": cutoff}
     if q:
         rx = literal_regex(q)
-        query["$or"] = [
+        or_clause = [
             {"title": {"$regex": rx, "$options": "i"}},
             {"company_name": {"$regex": rx, "$options": "i"}},
             {"description": {"$regex": rx, "$options": "i"}},
         ]
+        query["$and"] = query.get("$and", []) + [{"$or": or_clause}]
     cursor = db.jobs.find(query, {"_id": 0}).sort("posted_at", -1).skip(offset).limit(limit)
     items = await cursor.to_list(length=limit)
     total = await db.jobs.count_documents(query)
     return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/jobs/filters")
+async def jobs_filters():
+    """Return the currently-available filter values across active jobs.
+
+    Useful for the frontend to populate dropdowns without hardcoding lists.
+    """
+    db = get_db()
+    levels = await db.jobs.distinct("level", {"is_active": True})
+    sources = await db.jobs.distinct("source", {"is_active": True})
+    cities = await db.jobs.distinct("city", {"is_active": True})
+    # Top 40 tech tags by frequency
+    pipeline = [
+        {"$match": {"is_active": True}},
+        {"$unwind": "$skills"},
+        {"$group": {"_id": "$skills", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+        {"$limit": 40},
+    ]
+    tech_rows = await db.jobs.aggregate(pipeline).to_list(length=40)
+    tech = [{"tag": r["_id"], "count": r["count"]} for r in tech_rows if r["_id"]]
+    return {
+        "levels": sorted([lv for lv in levels if lv]),
+        "sources": sorted([s for s in sources if s]),
+        "cities": sorted([c for c in cities if c]),
+        "tech": tech,
+    }
 
 
 @router.get("/jobs/{job_id}")

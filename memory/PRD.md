@@ -110,6 +110,39 @@
 - ✅ testids: `profile-completeness`, `profile-completeness-ring`, `profile-completeness-pct`, `profile-check-{title|skills|resume|github|application}`
 - ✅ Demo user shows 60% (skills + github + application done; title + resume todo) — verified visually
 
+## Iteration 9 — Jun 20, 2026 (real ATS ingest + rich filters)
+
+### Ingest pipeline (`backend/ingest/`)
+- ✅ New module: `companies.py` (curated 71 company → ATS slug list), `locations.py` (alias-aware city parser → lat/lng), `extract.py` (regex tech/level/salary), `normalize.py` (shared `NormalizedJob` TypedDict + deterministic IDs), `runner.py` (parallel httpx fetch + Mongo upsert + stale-job expiry).
+- ✅ **5 ATS adapters** (`adapters/{greenhouse,lever,ashby,workable,recruitee}.py`) — all public unauthenticated JSON endpoints, no API keys needed → safe for open source.
+- ✅ **CLI**: `python -m ingest.cli verify` (pings every slug, reports 404s) and `python -m ingest.cli run [--source NAME]` (full or filtered ingest). Output writes a row to `db.ingest_runs` for observability.
+- ✅ **Tech extraction**: 50+ canonical tags (Python, React, AWS, Kubernetes, LLMs, etc.) with word-boundary aware regex so "go" doesn't match "google". Verified on real data: top hits are Python (701), LLMs (666), SQL (571), ML (570), AWS (363), Kubernetes (262).
+- ✅ **Level inference**: title-first regex (`Senior|Sr|Staff|Principal|Lead|Architect` → senior; `Intern|Jr|Junior|New Grad|Entry|Associate` → entry; else mid). Verified across 10 title shapes via unit tests.
+- ✅ **Salary parsing**: `$120K - $180K` / `$145,000 to $210,000` / `120 - 180` → `(120000, 180000)`. Ashby's structured `compensation.compensationTiers[*].components[*]` parsed separately.
+- ✅ **Location parsing**: 90+ city aliases (NYC, SF, Bay Area, Mountain View → San Jose cluster, Cambridge → Boston cluster). Remote-with-no-city falls back to company HQ so the city stays visible.
+- ✅ **First production ingest**: 3831 real jobs from 39 companies across 28 US cities in 36s. Top cities: SF (2491 jobs), NYC (807), Seattle (126), Chicago (93). Top techs: Python, LLMs, SQL, ML, AWS, Kubernetes, TypeScript, GCP, Java, React.
+
+### Scheduler
+- ✅ **APScheduler `AsyncIOScheduler`** wired into FastAPI lifespan (`services/scheduler.py`). Runs initial ingest at boot+30s, then every 6h (overridable via env: `INGEST_INTERVAL_HOURS`, `INGEST_STARTUP_DELAY_S`, `INGEST_SCHEDULER_DISABLED=1`). Verified: scheduler executed initial run after backend restart, found 38 companies, updated 3627 jobs, expired 204 stale.
+- ✅ Old `services/ingestion.py` (RemoteOK + small Greenhouse) left in place but unused — superseded by `ingest/runner.py`.
+
+### `/api/jobs` filter expansion
+- ✅ New filters on `GET /api/jobs`: `role` (title substring), `tech` (CSV OR-match against `skills`), `level` (entry/mid/senior), `posted_within` (e.g. `24h`, `7d`, `30d`, `1w`), `source` (ats name). All compose via AND.
+- ✅ New endpoint **`GET /api/jobs/filters`** returns live facets: levels, sources, cities, top 40 tech tags with counts → frontend dropdowns can be data-driven.
+
+### Seed migration
+- ✅ **Removed all fake job/company seeding from `scripts/seed.py`** — only demo+admin users and 30 demo applicants are seeded now (they don't depend on real ATS data). Jobs + companies are ingested live.
+- ✅ Dropped all existing seed jobs (763) and companies (39) from the DB before first real ingest.
+
+### Tests
+- ✅ `tests/test_ingest.py` — 29 unit tests covering extract (skills, level, salary, HTML sanitization, posted_at parsing) and locations (alias map + remote detection). Runs offline, sub-second.
+- ✅ `tests/test_jobs_filters.py` — 7 integration tests against the live FastAPI app verifying every new filter actually narrows the result set correctly.
+- ✅ All 15 pre-existing backend tests still pass (auth, security, applicants, jobs aggregation).
+
+### Known deferred items
+- 🟡 **3D building overflow** (SF/LA towers spilling past the West-Coast map edge) — deferred to next session per user. The spiral layout in `CompanyBuildings.jsx` needs a per-city radius cap or pyramid stacking when company count > ~12.
+- 🟡 Recruitee + Workable adapters work but their slug coverage in the curated list is weak (most 404). Adding more EU companies for Recruitee/Personio later.
+
 
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)
 - `admin@jobcity.app` / `Admin123!` (admin)
