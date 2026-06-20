@@ -84,6 +84,32 @@
 - ✅ **Login page** — added a top-right `X` close button (`login-guest-close-btn`) and a `Skip — continue as guest →` link (`login-continue-as-guest-btn`) below the form. Both navigate to `/`.
 - ✅ **Register page** — same X close (`register-guest-close-btn`) and `Skip — continue as guest →` link (`register-continue-as-guest-btn`).
 
+## Iteration 8 — Jun 20, 2026 (Bucket A + D + B + C)
+
+### Bucket A — Quick UX cleanups
+- ✅ **Removed "My Tower"** from NavBar (only Jobs City / Applicants City / Edit profile remain)
+- ✅ **Hide GitHub button** in ApplicantSidePanel when applicant has no real `github_username` (the fallback handle that produced 404 links is gone). New testid: `applicant-github-link`.
+- ✅ **Clear search input** after Enter→fly on Applicants City
+- ✅ Sheet → div migration on Applicants City confirmed (no dead Sheet import remained)
+
+### Bucket D — Jobs City parity with Applicants City
+- ✅ **Focus beam + halo + spinning diamond** marker over the selected company tower (`CompanyBuildings.FocusBeam`, golden #FFD23F, same pattern as Applicants)
+- ✅ **Smooth solo-mode dim** of non-selected company towers via lerped material opacity (`useFrame` on `matSoloRef`)
+- ✅ **Search-on-Enter fly-to-company** — pressing Enter in the Jobs City search box matches by company/city/state, sets selected + flyTarget, opens the side panel
+- ✅ **Camera fly + auto-rotate** — new `CameraFly` component in `JobsCityScene.jsx` mirrors the Applicants City fly logic (close/medium offsets, cubic ease, target+position lerp). Auto-rotate kicks in around the focused company until user interacts.
+- ✅ **Replaced Radix Sheet with a plain div side panel** (`CompanySidePanel`) — Radix Sheet was firing `onOpenChange(false)` immediately after open on the WebGL canvas (interpreting canvas pointer events as outside-interact). The div panel avoids that whole class of bug and matches the Applicants City visual language. New testid: `job-detail-panel`.
+
+### Bucket B — Backend hardening
+- ✅ **In-memory sliding-window rate limiter** — `backend/services/rate_limit.py`. Per-(endpoint, identifier) deque of timestamps, with `Retry-After` header on 429.
+- ✅ Wired into `/api/jobs/{job_id}/summary` (20 calls / 60s per IP+user, cache-miss path only) and `/api/jobs/{job_id}/match-score` (10 calls / 3600s per authenticated user, cache-miss path only)
+- ✅ **Applicants-city limit** — `/api/applicants-city/buildings?limit=500` (default 500, max 2000). Mongo cursor now `.sort("applications_count", -1).limit(limit)` so the most active 500 towers always make the cut. Response includes `total` + `returned` for the frontend to surface a "showing top N of M" badge later.
+
+### Bucket C — Profile completeness score
+- ✅ **New `ProfileCompleteness` component** on `/profile` — SVG ring (red <60%, amber 60–99%, green ≥100%), centered percentage, 2-column checklist beneath
+- ✅ 5-item rubric (each 20%): job title set, ≥3 skills, resume URL, GitHub linked, ≥1 application submitted
+- ✅ testids: `profile-completeness`, `profile-completeness-ring`, `profile-completeness-pct`, `profile-check-{title|skills|resume|github|application}`
+- ✅ Demo user shows 60% (skills + github + application done; title + resume todo) — verified visually
+
 
 - `demo@jobcity.app` / `Demo123!` (applicant, 5 applications)
 - `admin@jobcity.app` / `Admin123!` (admin)

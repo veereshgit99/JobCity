@@ -113,9 +113,10 @@ async def jobs_city_buildings():
 
 
 @router.get("/jobs/{job_id}/summary")
-async def job_brief(job_id: str):
+async def job_brief(job_id: str, request: Request):
     """LLM-generated role summary + required/nice-to-have skills. No auth required.
-    Cached for 7 days in `job_briefs` collection so we don't re-spend on Claude."""
+    Cached for 7 days in `job_briefs` collection so we don't re-spend on Claude.
+    Rate-limited to 20 calls / 60s per caller (IP, or user_id if signed in)."""
     db = get_db()
     job = await db.jobs.find_one({"job_id": job_id}, {"_id": 0})
     if not job:
@@ -132,6 +133,10 @@ async def job_brief(job_id: str):
                 return {"brief": {k: cached[k] for k in ("summary", "required_skills", "nice_to_have", "seniority")}, "cached": True}
         except Exception:
             pass
+
+    # Only rate-limit on the cache-miss path (cached returns are essentially free).
+    from services.rate_limit import enforce_rate_limit
+    await enforce_rate_limit(request, key="job_summary", limit=20, window_s=60)
 
     try:
         from services.llm import job_role_brief
@@ -176,6 +181,12 @@ async def match_score(job_id: str, request: Request):
                 return {"match": {k: cached[k] for k in ("score", "rationale", "strengths", "gaps")}, "cached": True}
         except Exception:
             pass
+
+    # Rate-limit cache-miss path: 10 fresh AI computations per hour per user.
+    from services.rate_limit import enforce_rate_limit
+    await enforce_rate_limit(
+        request, key="match_score", limit=10, window_s=3600, user_id=user["user_id"]
+    )
 
     try:
         from services.llm import job_match_score
