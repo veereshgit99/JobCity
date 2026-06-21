@@ -22,6 +22,7 @@ from ingest.extract import (
 from ingest.classify import classify
 from ingest.locations import detect_remote, parse_location
 from ingest.normalize import NormalizedJob, company_id_for, job_id_for
+from ingest.remote_spread import remote_city_for
 
 _BASE = "https://api.ashbyhq.com/posting-api/job-board/{slug}?includeCompensation=true"
 
@@ -77,8 +78,8 @@ async def fetch(company: dict, client: httpx.AsyncClient) -> List[NormalizedJob]
         body = html_to_text(j.get("descriptionHtml") or j.get("description") or "")
         is_remote = bool(j.get("isRemote")) or detect_remote(location_str, title)
         city, state, coords = parse_location(location_str)
-        if is_remote and not city and company.get("fallback_city"):
-            city, state, coords = parse_location(company["fallback_city"])
+        if is_remote:
+            city, state, coords = remote_city_for(job_id_for("ashby", sid))
         if not city:
             continue
         lo, hi = _ashby_comp(j.get("compensation") or {})

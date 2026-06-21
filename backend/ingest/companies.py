@@ -101,9 +101,19 @@ COMPANIES = [
     {"source": "recruitee", "slug": "tidio",       "name": "Tidio",          "color": _BLUE,  "fallback_city": "New York"},
     {"source": "recruitee", "slug": "infermedica", "name": "Infermedica",    "color": _CYAN,  "fallback_city": "Boston"},
 
-    # ── Robotics-focused companies (Greenhouse & Ashby) ─────────────────────
+    # ── Robotics & autonomy companies ───────────────────────────────────────
     {"source": "greenhouse", "slug": "nuro",                   "name": "Nuro",                  "color": _RED,      "fallback_city": "San Francisco"},
     {"source": "greenhouse", "slug": "wing",                   "name": "Wing",                  "color": _LIME,     "fallback_city": "San Francisco"},
+    {"source": "greenhouse", "slug": "waymo",                  "name": "Waymo",                 "color": _BLUE,     "fallback_city": "San Francisco"},
+    {"source": "greenhouse", "slug": "aurorainnovation",       "name": "Aurora",                "color": _GREEN,    "fallback_city": "Pittsburgh"},
+    {"source": "greenhouse", "slug": "wayve",                  "name": "Wayve",                 "color": _CYAN,     "fallback_city": "San Francisco"},
+    {"source": "greenhouse", "slug": "neuralink",              "name": "Neuralink",             "color": "#FFFFFF", "fallback_city": "San Francisco"},
+    {"source": "greenhouse", "slug": "diligentrobotics",       "name": "Diligent Robotics",     "color": _PURPLE,   "fallback_city": "Austin"},
+    {"source": "greenhouse", "slug": "locusrobotics",          "name": "Locus Robotics",        "color": _AMBER,    "fallback_city": "Boston"},
+    {"source": "greenhouse", "slug": "outrider",               "name": "Outrider",              "color": _BLUE,     "fallback_city": "Denver"},
+    {"source": "lever",      "slug": "zoox",                   "name": "Zoox",                  "color": _PINK,     "fallback_city": "San Francisco"},
+    {"source": "lever",      "slug": "dexterity",              "name": "Dexterity",             "color": _AMBER,    "fallback_city": "San Francisco"},
+    {"source": "lever",      "slug": "saronic",                "name": "Saronic",               "color": _BLUE,     "fallback_city": "Austin"},
     {"source": "ashby",      "slug": "1x",                     "name": "1X Technologies",       "color": _PURPLE,   "fallback_city": "San Francisco"},
     {"source": "ashby",      "slug": "physicalintelligence",   "name": "Physical Intelligence", "color": _CYAN,     "fallback_city": "San Francisco"},
     {"source": "ashby",      "slug": "figure",                 "name": "Figure",                "color": "#FFFFFF", "fallback_city": "San Francisco"},

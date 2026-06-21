@@ -21,6 +21,7 @@ from ingest.extract import (
 from ingest.classify import classify
 from ingest.locations import detect_remote, parse_location
 from ingest.normalize import NormalizedJob, company_id_for, job_id_for
+from ingest.remote_spread import remote_city_for
 
 _BASE = "https://boards-api.greenhouse.io/v1/boards/{slug}/jobs?content=true"
 
@@ -50,9 +51,10 @@ async def fetch(company: dict, client: httpx.AsyncClient) -> List[NormalizedJob]
         body = html_to_text(body_html)
         is_remote = detect_remote(location_str, title)
         city, state, coords = parse_location(location_str)
-        if is_remote and not city and company.get("fallback_city"):
-            # plant remote roles at the company HQ so the city stays visible
-            city, state, coords = parse_location(company["fallback_city"])
+        if is_remote:
+            # Spread remote roles across all known US cities so the map's
+            # empty regions get populated instead of piling on HQ.
+            city, state, coords = remote_city_for(job_id_for("greenhouse", sid))
         if not city:
             continue
         lo, hi = extract_salary_range(body)

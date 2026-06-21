@@ -22,6 +22,7 @@ from ingest.extract import (
 from ingest.classify import classify
 from ingest.locations import detect_remote, parse_location
 from ingest.normalize import NormalizedJob, company_id_for, job_id_for
+from ingest.remote_spread import remote_city_for
 
 _BASE = "https://{slug}.recruitee.com/api/offers/"
 
@@ -50,8 +51,8 @@ async def fetch(company: dict, client: httpx.AsyncClient) -> List[NormalizedJob]
         )[:4000]
         is_remote = bool(o.get("remote")) or detect_remote(location_str, title)
         city, state, coords = parse_location(location_str)
-        if is_remote and not city and company.get("fallback_city"):
-            city, state, coords = parse_location(company["fallback_city"])
+        if is_remote:
+            city, state, coords = remote_city_for(job_id_for("recruitee", sid))
         if not city:
             continue
         lo, hi = extract_salary_range(body)
