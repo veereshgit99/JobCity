@@ -25,6 +25,7 @@ class NormalizedJob(TypedDict, total=False):
     lng: Optional[float]
     remote: bool
     level: str                # entry | mid | senior
+    category: str             # software | robotics | ml | data | security | infra | hardware | design | product | management | business | other
     skills: list[str]
     salary_min: Optional[int]
     salary_max: Optional[int]

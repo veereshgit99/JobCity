@@ -33,12 +33,26 @@ async def list_jobs(
     source: Optional[str] = Query(
         None, description="greenhouse | lever | ashby | workable | recruitee"
     ),
+    category: Optional[str] = Query(
+        None,
+        description=(
+            "Comma-separated job-role categories (software, robotics, ml, data, security, "
+            "infra, hardware, design, product, management, business). "
+            "Defaults to technical IC roles only (excludes managers, sales, PMs, designers). "
+            "Pass 'all' to disable filtering."
+        ),
+    ),
     limit: int = Query(50, le=200),
     offset: int = 0,
 ):
     """List active jobs with rich filters.
 
-    All filters compose via AND. `tech` is OR-of-comma-separated values.
+    All filters compose via AND. `tech` and `category` are OR-of-comma-separated values.
+
+    When `category` is omitted, only **technical IC** roles are returned
+    (software / robotics / ml / data / security / infra / hardware). Pass
+    ``category=all`` to disable that gate, or specify any subset, e.g.
+    ``category=robotics,ml``.
     """
     db = get_db()
     query: dict = {"is_active": True}
@@ -56,6 +70,15 @@ async def list_jobs(
         lv = level.lower().strip()
         if lv in ("entry", "mid", "senior"):
             query["level"] = lv
+    # Category gating
+    from ingest.classify import TECHNICAL_IC, ALL_CATEGORIES
+    if not category:
+        query["category"] = {"$in": sorted(TECHNICAL_IC)}
+    elif category.strip().lower() != "all":
+        cats = [c.strip().lower() for c in category.split(",") if c.strip()]
+        cats = [c for c in cats if c in ALL_CATEGORIES]
+        if cats:
+            query["category"] = {"$in": cats}
     if role:
         rx = literal_regex(role)
         query["title"] = {"$regex": rx, "$options": "i"}
@@ -112,6 +135,14 @@ async def jobs_filters():
     levels = await db.jobs.distinct("level", {"is_active": True})
     sources = await db.jobs.distinct("source", {"is_active": True})
     cities = await db.jobs.distinct("city", {"is_active": True})
+    # Categories with counts (so the frontend can show "(123)" next to each)
+    cat_pipeline = [
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}},
+    ]
+    cat_rows = await db.jobs.aggregate(cat_pipeline).to_list(length=20)
+    categories = [{"name": r["_id"] or "other", "count": r["count"]} for r in cat_rows]
     # Top 40 tech tags by frequency
     pipeline = [
         {"$match": {"is_active": True}},
@@ -126,6 +157,7 @@ async def jobs_filters():
         "levels": sorted([lv for lv in levels if lv]),
         "sources": sorted([s for s in sources if s]),
         "cities": sorted([c for c in cities if c]),
+        "categories": categories,
         "tech": tech,
     }
 
@@ -141,11 +173,25 @@ async def get_job(job_id: str):
 
 
 @router.get("/jobs-city/buildings")
-async def jobs_city_buildings():
-    """Aggregate active jobs by (city, state) + company. Returns the 3D payload."""
+async def jobs_city_buildings(category: Optional[str] = None):
+    """Aggregate active jobs by (city, state) + company. Returns the 3D payload.
+
+    Filters to **technical IC roles only** by default (software, robotics, ml,
+    data, security, infra, hardware) so the city isn't crowded with manager /
+    sales / talent roles. Pass ``?category=all`` to disable.
+    """
     db = get_db()
+    from ingest.classify import TECHNICAL_IC, ALL_CATEGORIES
+    match: dict = {"is_active": True}
+    if not category:
+        match["category"] = {"$in": sorted(TECHNICAL_IC)}
+    elif category.strip().lower() != "all":
+        cats = [c.strip().lower() for c in category.split(",") if c.strip()]
+        cats = [c for c in cats if c in ALL_CATEGORIES]
+        if cats:
+            match["category"] = {"$in": cats}
     pipeline = [
-        {"$match": {"is_active": True}},
+        {"$match": match},
         {
             "$group": {
                 "_id": {

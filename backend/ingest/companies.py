@@ -100,4 +100,11 @@ COMPANIES = [
     # ── Recruitee ───────────────────────────────────────────────────────────
     {"source": "recruitee", "slug": "tidio",       "name": "Tidio",          "color": _BLUE,  "fallback_city": "New York"},
     {"source": "recruitee", "slug": "infermedica", "name": "Infermedica",    "color": _CYAN,  "fallback_city": "Boston"},
+
+    # ── Robotics-focused companies (Greenhouse & Ashby) ─────────────────────
+    {"source": "greenhouse", "slug": "nuro",                   "name": "Nuro",                  "color": _RED,      "fallback_city": "San Francisco"},
+    {"source": "greenhouse", "slug": "wing",                   "name": "Wing",                  "color": _LIME,     "fallback_city": "San Francisco"},
+    {"source": "ashby",      "slug": "1x",                     "name": "1X Technologies",       "color": _PURPLE,   "fallback_city": "San Francisco"},
+    {"source": "ashby",      "slug": "physicalintelligence",   "name": "Physical Intelligence", "color": _CYAN,     "fallback_city": "San Francisco"},
+    {"source": "ashby",      "slug": "figure",                 "name": "Figure",                "color": "#FFFFFF", "fallback_city": "San Francisco"},
 ]

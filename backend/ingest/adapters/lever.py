@@ -17,6 +17,7 @@ from ingest.extract import (
     infer_level,
     parse_posted_at,
 )
+from ingest.classify import classify
 from ingest.locations import detect_remote, parse_location
 from ingest.normalize import NormalizedJob, company_id_for, job_id_for
 
@@ -73,6 +74,7 @@ async def fetch(company: dict, client: httpx.AsyncClient) -> List[NormalizedJob]
                 lng=coords[1] if coords else None,
                 remote=is_remote,
                 level=infer_level(title, body),
+                category=classify(title),
                 skills=extract_skills(f"{title}\n{body}"),
                 salary_min=lo,
                 salary_max=hi,
